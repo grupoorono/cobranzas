@@ -345,6 +345,7 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
   <div class="page-tab active" onclick="switchPage('mensual')">📊 Mayo 2026</div>
   <div class="page-tab" onclick="switchPage('junio')">🔴 Junio 2026 <span style="font-size:10px;background:#dc2626;color:#fff;padding:1px 5px;border-radius:3px;margin-left:4px">EN VIVO</span></div>
   <div class="page-tab" onclick="switchPage('comparativo')">📈 Comparativo 2026</div>
+  <div class="page-tab" onclick="switchPage('debitos')">⚠️ Análisis Débitos</div>
 </div>
 
 <div id="page-mensual" class="page-content active">
@@ -576,6 +577,68 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
 </main>
 </div><!-- end page-comparativo -->
 
+<!-- DEBITOS PAGE -->
+<div id="page-debitos" class="page-content">
+<main>
+
+  <div class="sec-title">Resumen de Débitos — Enero a Mayo 2026</div>
+
+  <!-- KPIs de debitos -->
+  <div class="kpi-row" id="deb-kpis"></div>
+
+  <!-- 1. Evolución temporal -->
+  <div class="sec-title" style="margin-top:20px">1. Evolución Mensual de Débitos</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div class="chart-card">
+      <div class="chart-card-head"><h3>Importe Debitado por Mes</h3><span>en M$</span></div>
+      <div class="chart-body"><canvas id="deb-chart-total" height="200"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-head"><h3>% Débitos sobre Cobrado+Deb</h3><span>por mes</span></div>
+      <div class="chart-body"><canvas id="deb-chart-pct" height="200"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Evolución por institución -->
+  <div class="sec-title" style="margin-top:20px">Evolución por Institución</div>
+  <div class="chart-card">
+    <div class="chart-card-head"><h3>Débitos por Institución</h3><span>comparativo mensual en M$</span></div>
+    <div class="chart-body"><canvas id="deb-chart-inst" height="200"></canvas></div>
+  </div>
+
+  <!-- 2. Ranking con semáforo -->
+  <div class="sec-title" style="margin-top:20px">2. Ranking de Financiadores por % Débito</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div class="tc">
+      <div class="tc-head"><h3>Top Financiadores — Mayo 2026</h3><span>semáforo por % débito</span></div>
+      <div style="padding:4px 0" id="deb-ranking"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-head"><h3>Top 10 por Importe Debitado</h3><span>Mayo 2026</span></div>
+      <div class="chart-body"><canvas id="deb-chart-ranking" height="260"></canvas></div>
+    </div>
+  </div>
+
+  <!-- 3. Mapa de calor -->
+  <div class="sec-title" style="margin-top:20px">3. Mapa de Calor — % Débito por Financiador e Institución</div>
+  <div class="tc">
+    <div class="tc-head"><h3>Top 15 Financiadores × Institución</h3><span>% débito promedio Ene-May</span></div>
+    <div style="overflow-x:auto;padding:12px 16px" id="deb-heatmap"></div>
+  </div>
+
+  <!-- 4. Drill-down -->
+  <div class="sec-title" style="margin-top:20px">4. Evolución por Financiador</div>
+  <div class="tc">
+    <div class="tc-head" style="display:flex;align-items:center;gap:12px">
+      <h3>Tendencia mensual</h3>
+      <select id="deb-fin-select" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:4px 8px;border-radius:4px;font-size:12px;cursor:pointer"></select>
+    </div>
+    <div class="chart-body" style="padding:16px"><canvas id="deb-chart-fin" height="180"></canvas></div>
+  </div>
+
+</main>
+</div><!-- end page-debitos -->
+
 
 <footer>Grupo Oroño · Datos al 29 de Mayo 2026</footer>
 
@@ -592,6 +655,10 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
   <div class="mbn-tab mbn-highlight" onclick="switchPageMobile('comparativo',this)">
     <div class="mbn-icon">📈</div>
     <div class="mbn-label">Comparativo</div>
+  </div>
+  <div class="mbn-tab" onclick="switchPageMobile('debitos',this)" style="background:#1e3a5f">
+    <div class="mbn-icon">⚠️</div>
+    <div class="mbn-label">Débitos</div>
   </div>
 </div>
 <div class="modal-bg" id="modal">
@@ -1055,6 +1122,8 @@ function openJunioModal(inst){
 // Patch RAW_DATA lookup for junio modal
 const _origRenderTable=window.renderTable||null;
 
+const DEBITOS_DATA={"meses":["Enero","Febrero","Marzo","Abril","Mayo"],"inst":["PARQUE","NIÑOS","ICR","CTC","CIBIC","GO FUNES"],"monthly_total":{"Enero":{"deb":1172191826,"neto":15447149612,"pct":7.59},"Febrero":{"deb":1091911845,"neto":15657495928,"pct":6.97},"Marzo":{"deb":1133737956,"neto":16947443255,"pct":6.69},"Abril":{"deb":850300444,"neto":14045914207,"pct":6.05},"Mayo":{"deb":986837722,"neto":15013598927,"pct":6.57}},"monthly_inst":{"Enero":{"PARQUE":{"deb":481667996,"neto":5583564848,"pct":8.63},"NIÑOS":{"deb":290656955,"neto":3143980323,"pct":9.24},"ICR":{"deb":133509184,"neto":2036968012,"pct":6.55},"CTC":{"deb":231353072,"neto":2748763758,"pct":8.42},"CIBIC":{"deb":11853901,"neto":1226718002,"pct":0.97},"GO FUNES":{"deb":23150718,"neto":707154670,"pct":3.27}},"Febrero":{"PARQUE":{"deb":463280736,"neto":5441743978,"pct":8.51},"NIÑOS":{"deb":275265633,"neto":3011551445,"pct":9.14},"ICR":{"deb":147532465,"neto":2510815049,"pct":5.88},"CTC":{"deb":142989246,"neto":2647617630,"pct":5.4},"CIBIC":{"deb":26452019,"neto":1317655788,"pct":2.01},"GO FUNES":{"deb":36391747,"neto":728112037,"pct":5.0}},"Marzo":{"PARQUE":{"deb":500426587,"neto":6196912929,"pct":8.08},"NIÑOS":{"deb":260720981,"neto":2961800689,"pct":8.8},"ICR":{"deb":161152456,"neto":2589182688,"pct":6.22},"CTC":{"deb":169506081,"neto":2941856771,"pct":5.76},"CIBIC":{"deb":15343653,"neto":1393681463,"pct":1.1},"GO FUNES":{"deb":26588199,"neto":864008715,"pct":3.08}},"Abril":{"PARQUE":{"deb":400674798,"neto":5108240440,"pct":7.84},"NIÑOS":{"deb":221677248,"neto":2579200963,"pct":8.59},"ICR":{"deb":88396882,"neto":1618338735,"pct":5.46},"CTC":{"deb":104104040,"neto":2673942757,"pct":3.89},"CIBIC":{"deb":17152832,"neto":1384333439,"pct":1.24},"GO FUNES":{"deb":18294644,"neto":681857873,"pct":2.68}},"Mayo":{"PARQUE":{"deb":451138153,"neto":4642026474,"pct":9.72},"NIÑOS":{"deb":253752062,"neto":2779102933,"pct":9.13},"ICR":{"deb":155097015,"neto":2723443682,"pct":5.69},"CTC":{"deb":77498145,"neto":2348004005,"pct":3.3},"CIBIC":{"deb":24289687,"neto":1631403820,"pct":1.49},"GO FUNES":{"deb":25062660,"neto":889618013,"pct":2.82}}},"top15":["MEDICINA ESENCIAL","IAPOS ROSARIO","OSDE","IAPOS INTERIOR CARTERA ACTO MÉDICO","SWISS MEDICAL","JERARQUICOS","FEDERADA SALUD","AVALIAN","OSPAC","CAJA FORENSE 2DA","OMINT","SANCOR SALUD","ACINDAR","OSUNR (Obra Social de la Univerisad Nacional de Rosario)","IAPOS FUERA CÁPITA"],"top_fins_evo":{"MEDICINA ESENCIAL":{"Enero":{"deb":164652408,"pct":10.99},"Febrero":{"deb":184335124,"pct":8.44},"Marzo":{"deb":233022724,"pct":12.91},"Abril":{"deb":189541197,"pct":11.44},"Mayo":{"deb":137865861,"pct":12.98}},"IAPOS ROSARIO":{"Enero":{"deb":182339076,"pct":22.48},"Febrero":{"deb":140044748,"pct":31.83},"Marzo":{"deb":126941278,"pct":14.21},"Abril":{"deb":0,"pct":0},"Mayo":{"deb":113879032,"pct":27.2}},"OSDE":{"Enero":{"deb":128700496,"pct":5.61},"Febrero":{"deb":84683738,"pct":4.3},"Marzo":{"deb":149722494,"pct":4.93},"Abril":{"deb":72558654,"pct":3.84},"Mayo":{"deb":120074713,"pct":4.0}},"IAPOS INTERIOR CARTERA ACTO MÉDICO":{"Enero":{"deb":120904083,"pct":78.37},"Febrero":{"deb":102661126,"pct":19.95},"Marzo":{"deb":98813867,"pct":15.04},"Abril":{"deb":670,"pct":0.39},"Mayo":{"deb":68263583,"pct":19.23}},"SWISS MEDICAL":{"Enero":{"deb":48015426,"pct":2.55},"Febrero":{"deb":53086770,"pct":3.3},"Marzo":{"deb":41741547,"pct":2.25},"Abril":{"deb":81595260,"pct":4.31},"Mayo":{"deb":100612305,"pct":4.38}},"JERARQUICOS":{"Enero":{"deb":58420173,"pct":8.55},"Febrero":{"deb":86253352,"pct":10.3},"Marzo":{"deb":42111065,"pct":7.31},"Abril":{"deb":65315512,"pct":11.66},"Mayo":{"deb":54380662,"pct":11.94}},"FEDERADA SALUD":{"Enero":{"deb":46183219,"pct":3.69},"Febrero":{"deb":54089562,"pct":4.51},"Marzo":{"deb":49258473,"pct":3.59},"Abril":{"deb":52317563,"pct":4.97},"Mayo":{"deb":48392119,"pct":4.24}},"AVALIAN":{"Enero":{"deb":45057518,"pct":3.64},"Febrero":{"deb":50881290,"pct":3.95},"Marzo":{"deb":35132712,"pct":2.93},"Abril":{"deb":62815567,"pct":4.11},"Mayo":{"deb":25461544,"pct":2.82}},"OSPAC":{"Enero":{"deb":8906611,"pct":4.26},"Febrero":{"deb":17915470,"pct":4.37},"Marzo":{"deb":32747201,"pct":5.88},"Abril":{"deb":38982166,"pct":7.06},"Mayo":{"deb":44817678,"pct":8.18}},"CAJA FORENSE 2DA":{"Enero":{"deb":22544427,"pct":9.31},"Febrero":{"deb":47048787,"pct":9.53},"Marzo":{"deb":22413235,"pct":7.95},"Abril":{"deb":19971627,"pct":8.12},"Mayo":{"deb":11112999,"pct":4.96}},"OMINT":{"Enero":{"deb":66023530,"pct":26.07},"Febrero":{"deb":11461539,"pct":3.46},"Marzo":{"deb":17197450,"pct":5.19},"Abril":{"deb":8690514,"pct":2.64},"Mayo":{"deb":10905399,"pct":2.7}},"SANCOR SALUD":{"Enero":{"deb":24639452,"pct":2.0},"Febrero":{"deb":19084730,"pct":1.76},"Marzo":{"deb":32719980,"pct":2.86},"Abril":{"deb":20288734,"pct":1.91},"Mayo":{"deb":17284012,"pct":1.51}},"ACINDAR":{"Enero":{"deb":24662478,"pct":10.11},"Febrero":{"deb":32556568,"pct":11.7},"Marzo":{"deb":15711565,"pct":9.23},"Abril":{"deb":13020799,"pct":9.19},"Mayo":{"deb":21861973,"pct":25.47}},"OSUNR (Obra Social de la Univerisad Nacional de Rosario)":{"Enero":{"deb":23120349,"pct":4.0},"Febrero":{"deb":7994486,"pct":2.4},"Marzo":{"deb":12689037,"pct":3.4},"Abril":{"deb":16562607,"pct":5.51},"Mayo":{"deb":39137742,"pct":9.58}},"IAPOS FUERA CÁPITA":{"Enero":{"deb":25478224,"pct":18.96},"Febrero":{"deb":4406584,"pct":13.28},"Marzo":{"deb":12983837,"pct":7.59},"Abril":{"deb":19753434,"pct":18.54},"Mayo":{"deb":35051257,"pct":20.37}}},"heatmap":{"MEDICINA ESENCIAL":{"PARQUE":[11.1,6.3,15.9,19.0,40.3],"NIÑOS":[10.0,5.8,6.8,7.7,8.5],"ICR":[8.1,7.5,8.0,12.4,8.1],"CTC":[18.0,23.0,15.8,5.9,0],"CIBIC":[7.3,10.0,13.9,7.5,7.1],"GO FUNES":[6.4,10.8,10.8,6.3,5.5]},"IAPOS ROSARIO":{"PARQUE":[22.7,84.2,14.5,0,33.9],"NIÑOS":[38.3,9.9,25.9,0,59.4],"ICR":[9.6,88.5,10.7,0,13.8],"CTC":[43.8,4.8,5.1,0,17.4],"CIBIC":[0,0,0,0,0],"GO FUNES":[2.4,3.8,6.6,0,12.8]},"OSDE":{"PARQUE":[5.6,5.9,4.1,5.4,4.6],"NIÑOS":[5.5,2.4,2.7,3.7,4.7],"ICR":[1.7,2.7,6.1,1.9,3.1],"CTC":[13.1,8.2,10.0,5.8,5.1],"CIBIC":[0.2,0.5,0.7,0.9,2.1],"GO FUNES":[4.7,6.2,4.5,5.2,6.1]},"IAPOS INTERIOR CARTERA ACTO MÉDICO":{"PARQUE":[90.2,22.9,15.8,0,16.2],"NIÑOS":[99.4,35.2,29.5,0,26.1],"ICR":[49.1,8.1,6.7,0,66.4],"CTC":[57.8,6.2,12.3,0.4,7.3],"CIBIC":[0,0,0,0,0],"GO FUNES":[12.6,7.4,1.8,0,28.1]},"SWISS MEDICAL":{"PARQUE":[3.4,3.9,3.0,9.4,3.3],"NIÑOS":[4.5,4.0,5.5,4.1,8.8],"ICR":[1.3,3.8,1.1,2.8,6.9],"CTC":[1.5,1.3,0.8,1.6,0.8],"CIBIC":[0.3,5.2,0.1,0.0,0.3],"GO FUNES":[0.4,0.5,0.5,0.9,1.0]},"JERARQUICOS":{"PARQUE":[12.9,11.5,6.3,7.5,19.1],"NIÑOS":[6.5,13.6,7.5,22.5,53.5],"ICR":[9.9,10.8,16.0,6.2,8.2],"CTC":[6.6,5.2,2.5,10.0,8.8],"CIBIC":[0.8,5.3,0.1,0.9,0.5],"GO FUNES":[1.7,1.4,0.7,1.5,2.2]},"FEDERADA SALUD":{"PARQUE":[3.4,3.4,3.3,4.8,6.8],"NIÑOS":[9.1,9.8,9.2,9.5,3.7],"ICR":[4.1,6.7,4.6,6.9,4.6],"CTC":[0.4,0.1,1.7,1.5,2.1],"CIBIC":[0.0,0.0,0.0,0,0.1],"GO FUNES":[0.4,1.1,0.8,0.8,0.5]},"AVALIAN":{"PARQUE":[6.6,7.3,3.8,6.4,3.5],"NIÑOS":[5.2,5.3,6.6,6.1,7.9],"ICR":[0.9,1.3,1.5,0.8,2.0],"CTC":[0.5,0.7,1.0,0.6,0.3],"CIBIC":[0.0,0.0,0.5,0.0,0.1],"GO FUNES":[1.4,1.8,0.8,0.7,2.5]},"OSPAC":{"PARQUE":[4.5,8.0,7.7,11.0,15.0],"NIÑOS":[0,2.3,5.5,3.6,4.2],"ICR":[7.0,1.2,5.9,1.3,1.6],"CTC":[2.0,4.5,2.5,4.4,6.1],"CIBIC":[0,0.3,0.4,0.4,0.0],"GO FUNES":[2.2,2.8,3.3,2.7,1.3]},"CAJA FORENSE 2DA":{"PARQUE":[9.2,7.9,6.9,12.4,7.4],"NIÑOS":[8.8,11.2,12.2,6.3,7.8],"ICR":[20.1,10.5,11.3,13.7,3.5],"CTC":[3.0,4.4,2.5,1.2,1.7],"CIBIC":[0,0.5,0,0,0],"GO FUNES":[4.0,50.0,2.9,1.6,3.5]},"OMINT":{"PARQUE":[1.5,5.4,3.9,2.4,1.1],"NIÑOS":[2.4,0.0,4.5,1.6,3.2],"ICR":[0,0.4,0.9,2.7,3.0],"CTC":[86.7,0,9.0,5.7,6.3],"CIBIC":[0.5,0.4,0.0,0.9,0.0],"GO FUNES":[19.3,0,0,0,0.5]},"SANCOR SALUD":{"PARQUE":[3.4,1.7,4.4,1.9,2.5],"NIÑOS":[1.3,2.0,2.0,1.1,1.0],"ICR":[2.9,2.6,1.1,2.1,1.7],"CTC":[1.3,1.9,1.5,3.8,0.5],"CIBIC":[0.4,0.6,1.2,1.0,0.7],"GO FUNES":[0.9,0.3,3.7,0.2,0.2]},"ACINDAR":{"PARQUE":[14.6,13.4,11.1,14.4,100.0],"NIÑOS":[9.3,10.0,9.6,2.1,0],"ICR":[9.2,5.2,11.5,5.0,0.8],"CTC":[3.9,16.5,6.8,7.0,3.3],"CIBIC":[4.8,4.2,4.3,2.0,2.5],"GO FUNES":[0,0,0,0,0]},"OSUNR (Obra Social de la Univerisad Nacional de Rosario)":{"PARQUE":[6.0,4.5,4.8,14.1,22.7],"NIÑOS":[2.0,1.7,2.7,1.6,1.3],"ICR":[5.7,1.8,3.2,3.6,6.5],"CTC":[1.5,0.9,0.5,0.4,0.8],"CIBIC":[0.0,0.0,0,0,0.0],"GO FUNES":[0,0,0.0,0,0]},"IAPOS FUERA CÁPITA":{"PARQUE":[18.4,0,16.0,12.7,17.9],"NIÑOS":[3.6,13.3,1.6,44.6,48.6],"ICR":[78.6,0,0,86.9,97.5],"CTC":[2.2,0,0.1,0.4,11.1],"CIBIC":[0,0,0,0,0],"GO FUNES":[0,0,0,0,0]}}};
+
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo'];
 const INST_NAMES = ['PARQUE','NIÑOS','ICR','CTC','CIBIC','GO FUNES'];
 const COLORS = ['#0d1b2e','#1a6b5a','#2563a8','#b45309','#7c3aed','#0891b2'];
@@ -1068,6 +1137,7 @@ function switchPageMobile(page, el){
   el.classList.add('active');
   if(page==='comparativo' && !window._compBuilt){buildComparativo();window._compBuilt=true;}
   if(page==='junio' && !junioLoaded){loadJunio();}
+  if(page==='debitos' && !window._debitosBuilt){buildDebitos();window._debitosBuilt=true;}
   window.scrollTo(0,0);
 }
 
@@ -1289,6 +1359,158 @@ function buildComparativo(){
 </div>
 
 <script>
+// ── DÉBITOS PAGE ──
+const DEB_COLORS = ['#0d1b2e','#1a6b5a','#2563a8','#b45309','#7c3aed','#0891b2'];
+const SEMAFORO = (pct) => pct >= 10 ? '#dc2626' : pct >= 5 ? '#d97706' : '#16a34a';
+const SEMAFORO_BG = (pct) => pct >= 10 ? '#fee2e2' : pct >= 5 ? '#fef3c7' : '#dcfce7';
+const SEMAFORO_LABEL = (pct) => pct >= 10 ? '🔴 Alto' : pct >= 5 ? '🟡 Medio' : '🟢 Bajo';
+
+function buildDebitos(){
+  const D = DEBITOS_DATA;
+  const MESES_D = D.meses;
+  const chartOpts = {
+    responsive:true,
+    plugins:{legend:{labels:{color:'#374151',font:{family:"'Inter',sans-serif",size:11}}}},
+    scales:{
+      x:{ticks:{color:'#6b7280',font:{size:11}},grid:{display:false}},
+      y:{ticks:{color:'#6b7280',font:{size:10}},grid:{color:'rgba(0,0,0,.06)'}}
+    }
+  };
+
+  // KPIs
+  const lastMes = MESES_D[MESES_D.length-1];
+  const lt = D.monthly_total[lastMes];
+  const avg_pct = (Object.values(D.monthly_total).reduce((a,v)=>a+v.pct,0)/MESES_D.length).toFixed(2);
+  const max_mes = Object.entries(D.monthly_total).sort((a,b)=>b[1].deb-a[1].deb)[0];
+  const min_mes = Object.entries(D.monthly_total).sort((a,b)=>a[1].deb-b[1].deb)[0];
+  document.getElementById('deb-kpis').innerHTML=`
+    <div class="kpi-card k-amber"><div class="kpi-label">Debitado ${lastMes}</div><div class="kpi-value">${fmt(lt.deb)}</div><span class="kpi-badge kb-amber">${lt.pct}% sobre cobrado</span></div>
+    <div class="kpi-card"><div class="kpi-label">Promedio Mensual</div><div class="kpi-value">${fmt(Object.values(D.monthly_total).reduce((a,v)=>a+v.deb,0)/MESES_D.length)}</div><span class="kpi-badge ba">${avg_pct}% promedio</span></div>
+    <div class="kpi-card r"><div class="kpi-label">Mes con más débitos</div><div class="kpi-value" style="font-size:22px">${max_mes[0]}</div><div class="kpi-sub">${fmt(max_mes[1].deb)} — ${max_mes[1].pct}%</div></div>
+    <div class="kpi-card g"><div class="kpi-label">Mes con menos débitos</div><div class="kpi-value" style="font-size:22px">${min_mes[0]}</div><div class="kpi-sub">${fmt(min_mes[1].deb)} — ${min_mes[1].pct}%</div></div>`;
+
+  // Chart 1: total deb por mes
+  new Chart(document.getElementById('deb-chart-total'),{
+    type:'bar',
+    data:{labels:MESES_D,datasets:[{
+      label:'Importe Debitado',
+      data:MESES_D.map(m=>D.monthly_total[m].deb/1e6),
+      backgroundColor:'rgba(180,83,9,.7)',borderColor:'#b45309',borderWidth:1.5,borderRadius:3
+    }]},
+    options:{...chartOpts,scales:{...chartOpts.scales,y:{...chartOpts.scales.y,ticks:{...chartOpts.scales.y.ticks,callback:v=>v.toLocaleString('es-AR')}}}}
+  });
+
+  // Chart 2: pct por mes
+  new Chart(document.getElementById('deb-chart-pct'),{
+    type:'line',
+    data:{labels:MESES_D,datasets:[{
+      label:'% Débitos',
+      data:MESES_D.map(m=>D.monthly_total[m].pct),
+      borderColor:'#b45309',backgroundColor:'rgba(180,83,9,.1)',
+      borderWidth:2.5,pointRadius:5,pointBackgroundColor:'#b45309',tension:.3,fill:true
+    }]},
+    options:{...chartOpts,scales:{...chartOpts.scales,y:{...chartOpts.scales.y,ticks:{...chartOpts.scales.y.ticks,callback:v=>parseFloat(v.toFixed(2))+'%'}}}}
+  });
+
+  // Chart 3: inst evolution
+  const INST_D = D.inst;
+  new Chart(document.getElementById('deb-chart-inst'),{
+    type:'bar',
+    data:{labels:MESES_D,datasets:INST_D.map((inst,i)=>({
+      label:inst,
+      data:MESES_D.map(m=>D.monthly_inst[m]&&D.monthly_inst[m][inst]?D.monthly_inst[m][inst].deb/1e6:0),
+      backgroundColor:DEB_COLORS[i]+'aa',borderColor:DEB_COLORS[i],borderWidth:1.5,borderRadius:2
+    }))},
+    options:{...chartOpts,plugins:{...chartOpts.plugins,legend:{...chartOpts.plugins.legend,position:'bottom'}}}
+  });
+
+  // Ranking semáforo
+  const rankingWrap = document.getElementById('deb-ranking');
+  const lastFins = Object.entries(D.top_fins_evo)
+    .map(([f,v])=>({f, deb:v[lastMes]?.deb||0, pct:v[lastMes]?.pct||0}))
+    .sort((a,b)=>b.pct-a.pct);
+  rankingWrap.innerHTML = lastFins.slice(0,15).map(d=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--gray-200)">
+      <span style="width:16px;font-size:14px">${SEMAFORO_LABEL(d.pct).split(' ')[0]}</span>
+      <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.f}">${d.f}</span>
+      <span style="font-size:11px;color:var(--gray-500);width:70px;text-align:right">${fmt(d.deb)}</span>
+      <span style="font-size:11px;font-weight:700;color:${SEMAFORO(d.pct)};background:${SEMAFORO_BG(d.pct)};padding:2px 7px;border-radius:3px;width:58px;text-align:center">${d.pct.toFixed(1)}%</span>
+    </div>`).join('');
+
+  // Chart 4: ranking bar top10
+  const top10rank = lastFins.slice(0,10);
+  new Chart(document.getElementById('deb-chart-ranking'),{
+    type:'bar',
+    data:{
+      labels:top10rank.map(d=>d.f.length>20?d.f.substring(0,20)+'…':d.f),
+      datasets:[{
+        label:'Importe Debitado',
+        data:top10rank.map(d=>d.deb/1e6),
+        backgroundColor:top10rank.map(d=>SEMAFORO(d.pct)+'99'),
+        borderColor:top10rank.map(d=>SEMAFORO(d.pct)),
+        borderWidth:1.5,borderRadius:3
+      }]
+    },
+    options:{...chartOpts,indexAxis:'y',plugins:{legend:{display:false}},
+      scales:{x:{...chartOpts.scales.x,ticks:{...chartOpts.scales.x.ticks,callback:v=>v.toLocaleString('es-AR')}},
+              y:{...chartOpts.scales.y,ticks:{...chartOpts.scales.y.ticks,font:{size:10}}}}}
+  });
+
+  // Heatmap
+  const hmWrap = document.getElementById('deb-heatmap');
+  const hmHTML = [`<table style="border-collapse:collapse;width:100%;font-size:11px">
+    <thead><tr>
+      <th style="text-align:left;padding:5px 10px;color:var(--gray-500);font-weight:600;white-space:nowrap">Financiador</th>
+      ${INST_D.map(i=>`<th style="text-align:center;padding:5px 8px;color:var(--gray-500);font-weight:600;white-space:nowrap">${i}</th>`).join('')}
+    </tr></thead><tbody>`];
+  D.top15.forEach(fin=>{
+    const row = D.heatmap[fin];
+    hmHTML.push(`<tr style="border-bottom:1px solid var(--gray-200)">
+      <td style="padding:6px 10px;font-weight:500;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${fin}">${fin}</td>
+      ${INST_D.map(inst=>{
+        const pcts = row[inst]||[0,0,0,0,0];
+        const avg = pcts.reduce((a,v)=>a+v,0)/pcts.filter(v=>v>0).length||0;
+        const bg = avg>0?SEMAFORO_BG(avg):'transparent';
+        const color = avg>0?SEMAFORO(avg):'#ccc';
+        return `<td style="text-align:center;padding:6px 8px;background:${bg};color:${avg>0?SEMAFORO(avg):'#ccc'};font-weight:${avg>0?'600':'400'}">${avg>0?avg.toFixed(1)+'%':'—'}</td>`;
+      }).join('')}
+    </tr>`);
+  });
+  hmHTML.push('</tbody></table>');
+  hmWrap.innerHTML = hmHTML.join('');
+
+  // Drill-down selector
+  const select = document.getElementById('deb-fin-select');
+  D.top15.forEach(fin=>{
+    const opt = document.createElement('option');
+    opt.value=fin; opt.textContent=fin.length>35?fin.substring(0,35)+'…':fin;
+    select.appendChild(opt);
+  });
+  let finChart = null;
+  function renderFinChart(fin){
+    if(finChart){finChart.destroy();}
+    const d = D.top_fins_evo[fin];
+    finChart = new Chart(document.getElementById('deb-chart-fin'),{
+      type:'line',
+      data:{labels:MESES_D,datasets:[
+        {label:'Importe Debitado (M$)',data:MESES_D.map(m=>d[m]?.deb/1e6||0),
+         borderColor:'#b45309',backgroundColor:'rgba(180,83,9,.1)',
+         borderWidth:2.5,pointRadius:5,pointBackgroundColor:'#b45309',tension:.3,yAxisID:'y',fill:true},
+        {label:'% Débito',data:MESES_D.map(m=>d[m]?.pct||0),
+         borderColor:'#0d1b2e',backgroundColor:'transparent',
+         borderWidth:2,pointRadius:4,pointBackgroundColor:'#0d1b2e',tension:.3,yAxisID:'y1',borderDash:[4,3]}
+      ]},
+      options:{...chartOpts,scales:{
+        x:chartOpts.scales.x,
+        y:{...chartOpts.scales.y,position:'left',ticks:{...chartOpts.scales.y.ticks,callback:v=>v.toLocaleString('es-AR')}},
+        y1:{position:'right',ticks:{color:'#6b7280',font:{size:10},callback:v=>parseFloat(v.toFixed(2))+'%'},grid:{display:false}}
+      }}
+    });
+  }
+  renderFinChart(D.top15[0]);
+  select.addEventListener('change',()=>renderFinChart(select.value));
+}
+
 function closeChartFS(){
   const overlay = document.getElementById('chart-fs-overlay');
   overlay.classList.remove('open');
