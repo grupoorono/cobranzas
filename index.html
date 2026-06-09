@@ -1366,6 +1366,10 @@ const SEMAFORO_BG = (pct) => pct >= 10 ? '#fee2e2' : pct >= 5 ? '#fef3c7' : '#dc
 const SEMAFORO_LABEL = (pct) => pct >= 10 ? '🔴 Alto' : pct >= 5 ? '🟡 Medio' : '🟢 Bajo';
 
 function buildDebitos(){
+  // Wait for page to be visible before drawing charts
+  setTimeout(()=>{ _buildDebitosCharts(); }, 100);
+}
+function _buildDebitosCharts(){
   const D = DEBITOS_DATA;
   const MESES_D = D.meses;
   const chartOpts = {
