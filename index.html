@@ -182,7 +182,7 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
 .chart-card-head{background:var(--navy);padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
 .chart-card-head h3{color:#fff;font-size:12px;font-weight:600}
 .chart-card-head span{color:rgba(255,255,255,.5);font-size:10px}
-.chart-body{padding:20px 16px}
+.chart-body{padding:20px 16px;height:260px;position:relative}
 .chart-svg-wrap{width:100%;overflow-x:auto}
 /* trend line chart */
 .trend-chart{position:relative;height:220px}
@@ -591,11 +591,11 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
     <div class="chart-card">
       <div class="chart-card-head"><h3>Importe Debitado por Mes</h3><span>en M$</span></div>
-      <div class="chart-body"><canvas id="deb-chart-total" height="200"></canvas></div>
+      <div class="chart-body"><canvas id="deb-chart-total" height="200" style="min-height:200px"></canvas></div>
     </div>
     <div class="chart-card">
       <div class="chart-card-head"><h3>% Débitos sobre Cobrado+Deb</h3><span>por mes</span></div>
-      <div class="chart-body"><canvas id="deb-chart-pct" height="200"></canvas></div>
+      <div class="chart-body"><canvas id="deb-chart-pct" height="200" style="min-height:200px"></canvas></div>
     </div>
   </div>
 
@@ -1370,6 +1370,7 @@ function buildDebitos(){
   const MESES_D = D.meses;
   const chartOpts = {
     responsive:true,
+    maintainAspectRatio:false,
     plugins:{legend:{labels:{color:'#374151',font:{family:"'Inter',sans-serif",size:11}}}},
     scales:{
       x:{ticks:{color:'#6b7280',font:{size:11}},grid:{display:false}},
