@@ -1494,7 +1494,8 @@ function buildDebitosCharts(){
     const mes = document.getElementById('deb-mes-ranking')?.value || '';
     const subtitle = mes || 'todos los meses';
     document.getElementById('deb-ranking-title').textContent = 'Financiadores' + (mes?' — '+mes:'');
-    document.getElementById('deb-ranking-chart-subtitle').textContent = subtitle;
+    const subtitleEl = document.getElementById('deb-ranking-chart-subtitle');
+    if(subtitleEl) subtitleEl.textContent = subtitle;
 
     const fins = D.all_fins.map(fin=>{
       if(mes){
