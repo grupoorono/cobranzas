@@ -1502,10 +1502,11 @@ function buildDebitosCharts(){
         const d = D.all_fins_evo[fin]?.[mes] || {deb:0,pct:0};
         return {f:fin, deb:d.deb, pct:d.pct};
       } else {
-        const totalDeb = Object.values(D.all_fins_evo[fin]||{}).reduce((a,v)=>a+v.deb,0);
-        const totalNeto = D.all_fins.includes(fin) ? Object.values(D.all_fins_evo[fin]||{}).reduce((a,v)=>a+(v.deb/(v.pct/100)||0),0) : 0;
-        const avgPct = Object.values(D.all_fins_evo[fin]||{}).filter(v=>v.pct>0).reduce((a,v)=>a+v.pct,0) / (Object.values(D.all_fins_evo[fin]||{}).filter(v=>v.pct>0).length||1);
-        return {f:fin, deb:totalDeb, pct:parseFloat(avgPct.toFixed(2))};
+        const vals = Object.values(D.all_fins_evo[fin]||{});
+        const totalDeb = vals.reduce((a,v)=>a+v.deb,0);
+        const totalNeto = vals.reduce((a,v)=>a+(v.pct>0?v.deb/(v.pct/100):0),0);
+        const pct = totalNeto>0 ? totalDeb/totalNeto*100 : 0;
+        return {f:fin, deb:totalDeb, pct:parseFloat(pct.toFixed(2))};
       }
     }).filter(d=>d.deb>0).sort((a,b)=>b.pct-a.pct);
 
