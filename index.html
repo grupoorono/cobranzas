@@ -886,7 +886,7 @@ async function loadJunio(){
       const fecha= String(row['FechaFact']||'').substring(0,10);
       const resp2= String(row['Responsable']||'').trim();
 
-      if(!inst||!fin||ad<=0) return;
+      if(!inst||!fin||ad===0) return;
 
       // Per institution
       if(!instMap[inst]) instMap[inst]={presup:0,cobrado:0,debitado:0,neto:0,facturas:[],debitos:[]};
