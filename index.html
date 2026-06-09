@@ -1410,23 +1410,26 @@ const SEMAFORO_BG = (pct) => pct >= 10 ? '#fee2e2' : pct >= 5 ? '#fef3c7' : '#dc
 const SEMAFORO_LABEL = (pct) => pct >= 10 ? '🔴 Alto' : pct >= 5 ? '🟡 Medio' : '🟢 Bajo';
 
 function buildDebitos(){
-  // Wait for page to be visible before drawing charts
-  setTimeout(()=>{ buildDebitosCharts(); }, 300);
-}
-function buildDebitosCharts(){
+  // Populate selector immediately (no canvas needed)
   const D = DEBITOS_DATA;
-  const MESES_D = D.meses;
-
-  // Populate selector FIRST before any chart rendering
   const select = document.getElementById('deb-fin-select');
-  if(select){
-    select.innerHTML = '';
+  if(select && !select.options.length){
     D.all_fins.forEach(fin=>{
       const opt = document.createElement('option');
       opt.value=fin; opt.textContent=fin.length>40?fin.substring(0,40)+'…':fin;
       select.appendChild(opt);
     });
   }
+  // Wait for DOM to be visible using requestAnimationFrame + small delay
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      setTimeout(()=>{ buildDebitosCharts(); }, 50);
+    });
+  });
+}
+function buildDebitosCharts(){
+  const D = DEBITOS_DATA;
+  const MESES_D = D.meses;
 
   const chartOpts = {
     responsive:true,
