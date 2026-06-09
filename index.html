@@ -582,11 +582,9 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
 <main>
 
   <div class="sec-title">Resumen de Débitos — Enero a Mayo 2026</div>
-
-  <!-- KPIs de debitos -->
   <div class="kpi-row" id="deb-kpis"></div>
 
-  <!-- 1. Evolución temporal -->
+  <!-- 1. Evolución Mensual -->
   <div class="sec-title" style="margin-top:20px">1. Evolución Mensual de Débitos</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
     <div class="chart-card">
@@ -598,42 +596,66 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
       <div class="chart-body"><canvas id="deb-chart-pct" height="200" style="min-height:200px"></canvas></div>
     </div>
   </div>
-
-  <!-- Evolución por institución -->
-  <div class="sec-title" style="margin-top:20px">Evolución por Institución</div>
+  <div class="sec-title" style="margin-top:16px">Evolución por Institución</div>
   <div class="chart-card">
     <div class="chart-card-head"><h3>Débitos por Institución</h3><span>comparativo mensual en M$</span></div>
     <div class="chart-body"><canvas id="deb-chart-inst" height="200"></canvas></div>
   </div>
 
-  <!-- 2. Ranking con semáforo -->
-  <div class="sec-title" style="margin-top:20px">2. Ranking de Financiadores por % Débito</div>
+  <!-- 2. Evolución por Financiador (drill-down) -->
+  <div class="sec-title" style="margin-top:20px">2. Evolución por Financiador</div>
+  <div class="tc">
+    <div class="tc-head" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <h3>Tendencia mensual</h3>
+      <select id="deb-fin-select" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:4px 8px;border-radius:4px;font-size:12px;cursor:pointer;flex:1;min-width:200px;max-width:400px"></select>
+    </div>
+    <div class="chart-body" style="padding:16px"><canvas id="deb-chart-fin" height="180"></canvas></div>
+  </div>
+
+  <!-- 3. Ranking con semáforo + filtro mes -->
+  <div class="sec-title" style="margin-top:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <span>3. Ranking de Financiadores por % Débito</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:11px;color:var(--gray-500);font-weight:400;text-transform:none;letter-spacing:0">Filtrar mes:</span>
+      <select id="deb-mes-ranking" onchange="renderRanking()" style="background:#fff;border:1px solid var(--gray-300);color:var(--gray-700);padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer">
+        <option value="">Todos</option>
+        <option value="Enero">Enero</option>
+        <option value="Febrero">Febrero</option>
+        <option value="Marzo">Marzo</option>
+        <option value="Abril">Abril</option>
+        <option value="Mayo">Mayo</option>
+      </select>
+    </div>
+  </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
     <div class="tc">
-      <div class="tc-head"><h3>Top Financiadores — Mayo 2026</h3><span>semáforo por % débito</span></div>
-      <div style="padding:4px 0" id="deb-ranking"></div>
+      <div class="tc-head"><h3 id="deb-ranking-title">Financiadores</h3><span>semáforo por % débito</span></div>
+      <div style="padding:4px 0;max-height:480px;overflow-y:auto" id="deb-ranking"></div>
     </div>
     <div class="chart-card">
-      <div class="chart-card-head"><h3>Top 10 por Importe Debitado</h3><span>Mayo 2026</span></div>
+      <div class="chart-card-head"><h3>Top 10 por Importe Debitado</h3><span id="deb-ranking-chart-subtitle">todos los meses</span></div>
       <div class="chart-body"><canvas id="deb-chart-ranking" height="260"></canvas></div>
     </div>
   </div>
 
-  <!-- 3. Mapa de calor -->
-  <div class="sec-title" style="margin-top:20px">3. Mapa de Calor — % Débito por Financiador e Institución</div>
-  <div class="tc">
-    <div class="tc-head"><h3>Todos los Financiadores × Institución</h3><span>% débito promedio Ene-May</span></div>
-    <div style="overflow-x:auto;padding:12px 16px" id="deb-heatmap"></div>
-  </div>
-
-  <!-- 4. Drill-down -->
-  <div class="sec-title" style="margin-top:20px">4. Evolución por Financiador</div>
-  <div class="tc">
-    <div class="tc-head" style="display:flex;align-items:center;gap:12px">
-      <h3>Tendencia mensual</h3>
-      <select id="deb-fin-select" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:4px 8px;border-radius:4px;font-size:12px;cursor:pointer"></select>
+  <!-- 4. Mapa de calor + filtro mes -->
+  <div class="sec-title" style="margin-top:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <span>4. Mapa de Calor — % Débito por Financiador e Institución</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:11px;color:var(--gray-500);font-weight:400;text-transform:none;letter-spacing:0">Filtrar mes:</span>
+      <select id="deb-mes-heatmap" onchange="renderHeatmap()" style="background:#fff;border:1px solid var(--gray-300);color:var(--gray-700);padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer">
+        <option value="">Todos</option>
+        <option value="0">Enero</option>
+        <option value="1">Febrero</option>
+        <option value="2">Marzo</option>
+        <option value="3">Abril</option>
+        <option value="4">Mayo</option>
+      </select>
     </div>
-    <div class="chart-body" style="padding:16px"><canvas id="deb-chart-fin" height="180"></canvas></div>
+  </div>
+  <div class="tc">
+    <div class="tc-head"><h3>Todos los Financiadores × Institución</h3><span>% débito — click encabezado para ordenar</span></div>
+    <div style="padding:12px 16px" id="deb-heatmap"></div>
   </div>
 
 </main>
@@ -1359,7 +1381,7 @@ function buildComparativo(){
 </div>
 
 <script>
-// ── DÉBITOS PAGE ──
+// == DEBITOS PAGE ==
 const DEB_COLORS = ['#0d1b2e','#1a6b5a','#2563a8','#b45309','#7c3aed','#0891b2'];
 const SEMAFORO = (pct) => pct >= 10 ? '#dc2626' : pct >= 5 ? '#d97706' : '#16a34a';
 const SEMAFORO_BG = (pct) => pct >= 10 ? '#fee2e2' : pct >= 5 ? '#fef3c7' : '#dcfce7';
@@ -1367,9 +1389,9 @@ const SEMAFORO_LABEL = (pct) => pct >= 10 ? '🔴 Alto' : pct >= 5 ? '🟡 Medio
 
 function buildDebitos(){
   // Wait for page to be visible before drawing charts
-  setTimeout(()=>{ _buildDebitosCharts(); }, 100);
+  setTimeout(()=>{ buildDebitosCharts(); }, 100);
 }
-function _buildDebitosCharts(){
+function buildDebitosCharts(){
   const D = DEBITOS_DATA;
   const MESES_D = D.meses;
   const chartOpts = {
@@ -1429,60 +1451,127 @@ function _buildDebitosCharts(){
     options:{...chartOpts,plugins:{...chartOpts.plugins,legend:{...chartOpts.plugins.legend,position:'bottom'}},scales:{...chartOpts.scales,y:{...chartOpts.scales.y,min:0,ticks:{...chartOpts.scales.y.ticks,callback:v=>v.toLocaleString('es-AR')+' M'}}}}
   });
 
-  // Ranking semáforo
-  const rankingWrap = document.getElementById('deb-ranking');
-  const lastFins = Object.entries(D.top_fins_evo)
-    .map(([f,v])=>({f, deb:v[lastMes]?.deb||0, pct:v[lastMes]?.pct||0}))
-    .sort((a,b)=>b.pct-a.pct);
-  rankingWrap.innerHTML = lastFins.slice(0,15).map(d=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--gray-200)">
-      <span style="width:16px;font-size:14px">${SEMAFORO_LABEL(d.pct).split(' ')[0]}</span>
-      <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.f}">${d.f}</span>
-      <span style="font-size:11px;color:var(--gray-500);width:70px;text-align:right">${fmt(d.deb)}</span>
-      <span style="font-size:11px;font-weight:700;color:${SEMAFORO(d.pct)};background:${SEMAFORO_BG(d.pct)};padding:2px 7px;border-radius:3px;width:58px;text-align:center">${d.pct.toFixed(1)}%</span>
-    </div>`).join('');
+  // Ranking — with month filter
+  let rankingChart = null;
+  window.renderRanking = function(){
+    const mes = document.getElementById('deb-mes-ranking')?.value || '';
+    const subtitle = mes || 'todos los meses';
+    document.getElementById('deb-ranking-title').textContent = 'Financiadores' + (mes?' — '+mes:'');
+    document.getElementById('deb-ranking-chart-subtitle').textContent = subtitle;
 
-  // Chart 4: ranking bar top10
-  const top10rank = lastFins.slice(0,10);
-  new Chart(document.getElementById('deb-chart-ranking'),{
-    type:'bar',
-    data:{
-      labels:top10rank.map(d=>d.f.length>20?d.f.substring(0,20)+'…':d.f),
-      datasets:[{
-        label:'Importe Debitado',
-        data:top10rank.map(d=>d.deb/1e6),
-        backgroundColor:top10rank.map(d=>SEMAFORO(d.pct)+'99'),
-        borderColor:top10rank.map(d=>SEMAFORO(d.pct)),
-        borderWidth:1.5,borderRadius:3
-      }]
-    },
-    options:{...chartOpts,indexAxis:'y',plugins:{legend:{display:false}},
-      scales:{x:{...chartOpts.scales.x,min:0,ticks:{...chartOpts.scales.x.ticks,callback:v=>v.toLocaleString('es-AR')+' M'}},
-              y:{...chartOpts.scales.y,ticks:{...chartOpts.scales.y.ticks,font:{size:10}}}}}
-  });
+    const fins = D.all_fins.map(fin=>{
+      if(mes){
+        const d = D.all_fins_evo[fin]?.[mes] || {deb:0,pct:0};
+        return {f:fin, deb:d.deb, pct:d.pct};
+      } else {
+        const totalDeb = Object.values(D.all_fins_evo[fin]||{}).reduce((a,v)=>a+v.deb,0);
+        const totalNeto = D.all_fins.includes(fin) ? Object.values(D.all_fins_evo[fin]||{}).reduce((a,v)=>a+(v.deb/(v.pct/100)||0),0) : 0;
+        const avgPct = Object.values(D.all_fins_evo[fin]||{}).filter(v=>v.pct>0).reduce((a,v)=>a+v.pct,0) / (Object.values(D.all_fins_evo[fin]||{}).filter(v=>v.pct>0).length||1);
+        return {f:fin, deb:totalDeb, pct:parseFloat(avgPct.toFixed(2))};
+      }
+    }).filter(d=>d.deb>0).sort((a,b)=>b.pct-a.pct);
+
+    const rankingWrap = document.getElementById('deb-ranking');
+    rankingWrap.innerHTML = fins.map(d=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--gray-200)">
+        <span style="width:16px;font-size:13px">${SEMAFORO_LABEL(d.pct).split(' ')[0]}</span>
+        <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.f}">${d.f}</span>
+        <span style="font-size:11px;color:var(--gray-500);width:70px;text-align:right">${fmt(d.deb)}</span>
+        <span style="font-size:11px;font-weight:700;color:${SEMAFORO(d.pct)};background:${SEMAFORO_BG(d.pct)};padding:2px 7px;border-radius:3px;width:58px;text-align:center">${d.pct.toFixed(1)}%</span>
+      </div>`).join('');
+
+    const top10 = fins.slice(0,10);
+    if(rankingChart){rankingChart.destroy();}
+    rankingChart = new Chart(document.getElementById('deb-chart-ranking'),{
+      type:'bar',
+      data:{
+        labels:top10.map(d=>d.f.length>20?d.f.substring(0,20)+'…':d.f),
+        datasets:[{
+          label:'Importe Debitado',
+          data:top10.map(d=>d.deb/1e6),
+          backgroundColor:top10.map(d=>SEMAFORO(d.pct)+'99'),
+          borderColor:top10.map(d=>SEMAFORO(d.pct)),
+          borderWidth:1.5,borderRadius:3
+        }]
+      },
+      options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+        plugins:{legend:{display:false}},
+        scales:{
+          x:{min:0,ticks:{color:'#6b7280',font:{size:10},callback:v=>v.toLocaleString('es-AR')+' M'},grid:{color:'rgba(0,0,0,.06)'}},
+          y:{ticks:{color:'#374151',font:{size:10}},grid:{display:false}}
+        }}
+    });
+  };
+  renderRanking();
 
   // Heatmap
+  // Heatmap — sortable, scrollable, with month filter
   const hmWrap = document.getElementById('deb-heatmap');
-  const hmHTML = [`<table style="border-collapse:collapse;width:100%;font-size:11px">
-    <thead><tr>
-      <th style="text-align:left;padding:5px 10px;color:var(--gray-500);font-weight:600;white-space:nowrap">Financiador</th>
-      ${INST_D.map(i=>`<th style="text-align:center;padding:5px 8px;color:var(--gray-500);font-weight:600;white-space:nowrap">${i}</th>`).join('')}
-    </tr></thead><tbody>`];
-  D.all_fins.forEach(fin=>{
-    const row = D.heatmap[fin];
-    hmHTML.push(`<tr style="border-bottom:1px solid var(--gray-200)">
-      <td style="padding:6px 10px;font-weight:500;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${fin}">${fin}</td>
-      ${INST_D.map(inst=>{
-        const pcts = row[inst]||[0,0,0,0,0];
-        const avg = pcts.reduce((a,v)=>a+v,0)/pcts.filter(v=>v>0).length||0;
-        const bg = avg>0?SEMAFORO_BG(avg):'transparent';
-        const color = avg>0?SEMAFORO(avg):'#ccc';
-        return `<td style="text-align:center;padding:6px 8px;background:${bg};color:${avg>0?SEMAFORO(avg):'#ccc'};font-weight:${avg>0?'600':'400'}">${avg>0?avg.toFixed(1)+'%':'—'}</td>`;
-      }).join('')}
-    </tr>`);
-  });
-  hmHTML.push('</tbody></table>');
-  hmWrap.innerHTML = hmHTML.join('');
+  let hmSortCol = -1;
+  let hmSortAsc = false;
+  const INST_D2 = D.inst;
+
+  window.renderHeatmap = function(){
+    const mesIdx = document.getElementById('deb-mes-heatmap')?.value;
+    const hasMes = mesIdx !== '' && mesIdx !== null && mesIdx !== undefined;
+
+    const rows = D.all_fins.map(fin=>{
+      const instPcts = INST_D2.map(inst=>{
+        const pcts = D.heatmap[fin]?.[inst]||[0,0,0,0,0];
+        if(hasMes){
+          return pcts[parseInt(mesIdx)]||0;
+        } else {
+          const vals = pcts.filter(v=>v>0);
+          return vals.length ? vals.reduce((a,v)=>a+v,0)/vals.length : 0;
+        }
+      });
+      const avgAll = instPcts.filter(v=>v>0);
+      return {fin, instPcts, avg: avgAll.length ? avgAll.reduce((a,v)=>a+v,0)/avgAll.length : 0};
+    }).filter(r=>r.avg>0 || r.instPcts.some(v=>v>0));
+
+    const sorted = [...rows].sort((a,b)=>{
+      if(hmSortCol === -1) return b.avg - a.avg;
+      if(hmSortCol === 'fin') return hmSortAsc ? a.fin.localeCompare(b.fin) : b.fin.localeCompare(a.fin);
+      const av = a.instPcts[hmSortCol]||0, bv = b.instPcts[hmSortCol]||0;
+      return hmSortAsc ? av-bv : bv-av;
+    });
+
+    const arrow = (col) => hmSortCol===col ? (hmSortAsc?' ↑':' ↓') : ' ⇅';
+
+    hmWrap.innerHTML = `
+      <div style="max-height:520px;overflow-y:auto;overflow-x:auto">
+      <table style="border-collapse:collapse;width:100%;font-size:12px;min-width:600px">
+        <thead style="position:sticky;top:0;z-index:5;background:#fff">
+          <tr>
+            <th onclick="hmSort('fin')" style="text-align:left;padding:8px 12px;color:var(--gray-700);font-weight:600;white-space:nowrap;cursor:pointer;background:#f8f9fa;border-bottom:2px solid var(--gray-200)">
+              Financiador${arrow('fin')}
+            </th>
+            ${INST_D2.map((inst,i)=>`
+            <th onclick="hmSort(${i})" style="text-align:center;padding:8px 10px;color:var(--gray-700);font-weight:600;white-space:nowrap;cursor:pointer;background:#f8f9fa;border-bottom:2px solid var(--gray-200)">
+              ${inst}${arrow(i)}
+            </th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${sorted.map(({fin,instPcts})=>`
+          <tr style="border-bottom:1px solid var(--gray-200)">
+            <td style="padding:7px 12px;font-weight:500;white-space:nowrap;font-size:12px;color:var(--gray-900)">${fin}</td>
+            ${instPcts.map(avg=>`
+            <td style="text-align:center;padding:7px 10px;background:${avg>0?SEMAFORO_BG(avg):'transparent'};font-weight:${avg>0?'600':'400'};color:${avg>0?SEMAFORO(avg):'#ccc'};font-size:12px">
+              ${avg>0?avg.toFixed(1)+'%':'—'}
+            </td>`).join('')}
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      </div>`;
+  };
+
+  window.hmSort = function(col){
+    if(hmSortCol===col){ hmSortAsc=!hmSortAsc; }
+    else { hmSortCol=col; hmSortAsc = col==='fin'; }
+    renderHeatmap();
+  };
+  renderHeatmap();
 
   // Drill-down selector — ALL financiadores
   const select = document.getElementById('deb-fin-select');
