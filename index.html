@@ -633,8 +633,30 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
       <div style="padding:4px 0;max-height:480px;overflow-y:auto" id="deb-ranking"></div>
     </div>
     <div class="chart-card">
-      <div class="chart-card-head"><h3>Top 10 por Importe Debitado</h3><span id="deb-ranking-chart-subtitle">todos los meses</span></div>
-      <div class="chart-body"><canvas id="deb-chart-ranking" height="260"></canvas></div>
+      <div class="tc-head" style="display:flex;align-items:center;justify-content:space-between">
+        <h3 id="deb-detail-title">Detalle de comprobantes</h3>
+        <span style="font-size:11px;color:rgba(255,255,255,.5)">click en un financiador para ver</span>
+      </div>
+      <div id="deb-detail-empty" style="padding:40px;text-align:center;color:var(--gray-500)">
+        <div style="font-size:28px;margin-bottom:8px">👆</div>
+        <div style="font-size:13px">Hacé click en un financiador del ranking para ver sus comprobantes debitados</div>
+      </div>
+      <div id="deb-detail-wrap" style="display:none;max-height:460px;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead style="position:sticky;top:0;background:var(--navy);z-index:5">
+            <tr>
+              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Institución</th>
+              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Comprobante</th>
+              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Fecha</th>
+              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Adeudado</th>
+              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Debitado</th>
+              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.8px">% Deb.</th>
+            </tr>
+          </thead>
+          <tbody id="deb-detail-tbody"></tbody>
+        </table>
+        <div id="deb-detail-footer" style="padding:8px 12px;background:#f8f9fa;border-top:1px solid var(--gray-200);font-size:11px;color:var(--gray-700);font-weight:600"></div>
+      </div>
     </div>
   </div>
 
@@ -1473,34 +1495,21 @@ function buildDebitosCharts(){
 
     const rankingWrap = document.getElementById('deb-ranking');
     rankingWrap.innerHTML = fins.map(d=>`
-      <div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--gray-200)">
+      <div data-fin="${d.f.replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--gray-200);cursor:pointer;transition:background .1s" 
+           onmouseover="this.style.background='#f0f4f8'" onmouseout="this.style.background=''"
+           onclick="showDebDetail('${d.f.replace(/'/g,"\\'")}')">
         <span style="width:16px;font-size:13px">${SEMAFORO_LABEL(d.pct).split(' ')[0]}</span>
         <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.f}">${d.f}</span>
         <span style="font-size:11px;color:var(--gray-500);width:70px;text-align:right">${fmt(d.deb)}</span>
         <span style="font-size:11px;font-weight:700;color:${SEMAFORO(d.pct)};background:${SEMAFORO_BG(d.pct)};padding:2px 7px;border-radius:3px;width:58px;text-align:center">${d.pct.toFixed(1)}%</span>
       </div>`).join('');
 
-    const top10 = fins.slice(0,10);
-    if(rankingChart){rankingChart.destroy();}
-    rankingChart = new Chart(document.getElementById('deb-chart-ranking'),{
-      type:'bar',
-      data:{
-        labels:top10.map(d=>d.f.length>20?d.f.substring(0,20)+'…':d.f),
-        datasets:[{
-          label:'Importe Debitado',
-          data:top10.map(d=>d.deb/1e6),
-          backgroundColor:top10.map(d=>SEMAFORO(d.pct)+'99'),
-          borderColor:top10.map(d=>SEMAFORO(d.pct)),
-          borderWidth:1.5,borderRadius:3
-        }]
-      },
-      options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
-        plugins:{legend:{display:false}},
-        scales:{
-          x:{min:0,ticks:{color:'#6b7280',font:{size:10},callback:v=>v.toLocaleString('es-AR')+' M'},grid:{color:'rgba(0,0,0,.06)'}},
-          y:{ticks:{color:'#374151',font:{size:10}},grid:{display:false}}
-        }}
-    });
+    // Make ranking rows clickable — show comprobantes detail
+    rankingWrap.querySelectorAll && setTimeout(()=>{
+      rankingWrap.querySelectorAll('[data-fin]').forEach(row=>{
+        row.addEventListener('click', ()=> showDebDetail(row.dataset.fin));
+      });
+    }, 50);
   };
   renderRanking();
 
@@ -1608,6 +1617,60 @@ function buildDebitosCharts(){
   renderFinChart(D.all_fins[0]);
   select.addEventListener('change',function(){renderFinChart(this.value);});
 }
+
+// Detail panel for debitos ranking
+window.showDebDetail = function(financiador){
+  const empty = document.getElementById('deb-detail-empty');
+  const wrap = document.getElementById('deb-detail-wrap');
+  const tbody = document.getElementById('deb-detail-tbody');
+  const title = document.getElementById('deb-detail-title');
+  const footer = document.getElementById('deb-detail-footer');
+
+  // Collect all debito rows for this financiador from RAW_DATA (Mayo)
+  const INST_NAMES = ['PARQUE','NIÑOS','ICR','CTC','CIBIC','GO FUNES'];
+  const rows = [];
+  INST_NAMES.forEach(inst=>{
+    const d = RAW_DATA[inst];
+    if(!d) return;
+    d.debitos.forEach(r=>{
+      if(r.financiador === financiador){
+        rows.push({...r, inst});
+      }
+    });
+  });
+
+  if(!rows.length){
+    empty.style.display='block';
+    wrap.style.display='none';
+    empty.innerHTML=`<div style="font-size:28px;margin-bottom:8px">📭</div><div style="font-size:13px">No hay comprobantes debitados para <strong>${financiador}</strong> en Mayo 2026</div>`;
+    title.textContent='Detalle de comprobantes — '+financiador;
+    return;
+  }
+
+  // Sort by debitado desc
+  rows.sort((a,b)=>Math.abs(b.debitado)-Math.abs(a.debitado));
+
+  let totAd=0, totDeb=0;
+  tbody.innerHTML = rows.map(r=>{
+    const ad = Math.abs(r.adeudado||0);
+    const deb = Math.abs(r.debitado||0);
+    const pct = ad>0 ? (deb/ad*100).toFixed(1)+'%' : '—';
+    totAd+=ad; totDeb+=deb;
+    return `<tr style="border-bottom:1px solid var(--gray-200)">
+      <td style="padding:6px 12px;font-size:11px"><span style="background:rgba(14,124,123,.15);color:#1a6b5a;padding:1px 6px;border-radius:3px;font-weight:600">${r.inst}</span></td>
+      <td style="padding:6px 12px;font-size:11px;white-space:nowrap">${r.comprobante||'—'}</td>
+      <td style="padding:6px 12px;font-size:11px;color:#6b7280;white-space:nowrap">${r.fecha_fact||'—'}</td>
+      <td style="padding:6px 12px;font-size:11px;text-align:right;font-variant-numeric:tabular-nums">${ad?fmtFull(ad):'—'}</td>
+      <td style="padding:6px 12px;font-size:11px;text-align:right;font-variant-numeric:tabular-nums;color:#b45309;font-weight:600">${deb?fmtFull(deb):'—'}</td>
+      <td style="padding:6px 12px;font-size:11px;text-align:right;font-weight:600;color:${SEMAFORO(parseFloat(pct)||0)}">${pct}</td>
+    </tr>`;
+  }).join('');
+
+  footer.innerHTML = `${rows.length} comprobantes | Adeudado total: $${fmtFull(totAd)} | Debitado total: $${fmtFull(totDeb)} | % promedio: ${totAd>0?(totDeb/totAd*100).toFixed(1)+'%':'—'}`;
+  title.textContent = 'Comprobantes — '+financiador+' (Mayo 2026)';
+  empty.style.display='none';
+  wrap.style.display='block';
+};
 
 function closeChartFS(){
   const overlay = document.getElementById('chart-fs-overlay');
