@@ -887,9 +887,15 @@ function colIdx(headers, names){
 }
 
 async function fetchSheet(inst, url){
-  // Use allorigins proxy to bypass CORS when opening as local file
-  const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
-  const resp = await fetch(proxyUrl);
+  // Try direct fetch first, then fallback to proxy
+  let resp;
+  try {
+    resp = await fetch(url);
+    if(!resp.ok) throw new Error('direct failed');
+  } catch(e) {
+    const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
+    resp = await fetch(proxyUrl);
+  }
   if(!resp.ok) throw new Error('HTTP '+resp.status);
   const text = await resp.text();
   const rows = parseCSV(text);
