@@ -491,16 +491,20 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
 
     <div class="sec-title">Financiadores <span id="junio-fin-count" style="font-weight:400;text-transform:none;letter-spacing:0"></span></div>
     <div class="tc">
-      <table id="junio-fin-table"><thead><tr>
-        <th onclick="sortJunioFin(0)" style="cursor:pointer">Financiador ⇅</th>
-        <th class="r" onclick="sortJunioFin(1)" style="cursor:pointer">Presupuestado ⇅</th>
-        <th class="r" onclick="sortJunioFin(2)" style="cursor:pointer">Cobrado + Débitos ⇅</th>
-        <th class="r" onclick="sortJunioFin(3)" style="cursor:pointer">Cobrado ⇅</th>
-        <th class="r" onclick="sortJunioFin(4)" style="cursor:pointer">Débitos ⇅</th>
-        <th class="r" onclick="sortJunioFin(5)" style="cursor:pointer">% Deb. ⇅</th>
-        <th class="r" onclick="sortJunioFin(6)" style="cursor:pointer">Ppto No Cob. ⇅</th>
-      </tr></thead>
-      <tbody id="junio-fin-tbody"></tbody></table>
+      <div style="overflow-x:auto">
+        <div style="max-height:580px;overflow-y:auto">
+          <table id="junio-fin-table" style="width:100%;border-collapse:collapse"><thead style="position:sticky;top:0;z-index:5"><tr>
+            <th onclick="sortJunioFin(0)" style="cursor:pointer;background:var(--navy);padding:8px 13px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap">Financiador ⇅</th>
+            <th class="r" onclick="sortJunioFin(1)" style="cursor:pointer;background:var(--navy);padding:8px 13px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap">Presupuestado ⇅</th>
+            <th class="r" onclick="sortJunioFin(2)" style="cursor:pointer;background:var(--navy);padding:8px 13px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap">Cobrado + Débitos ⇅</th>
+            <th class="r" onclick="sortJunioFin(3)" style="cursor:pointer;background:var(--navy);padding:8px 13px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap">Cobrado ⇅</th>
+            <th class="r" onclick="sortJunioFin(4)" style="cursor:pointer;background:var(--navy);padding:8px 13px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap">Débitos ⇅</th>
+            <th class="r" onclick="sortJunioFin(5)" style="cursor:pointer;background:var(--navy);padding:8px 13px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap">% Deb. ⇅</th>
+            <th class="r" onclick="sortJunioFin(6)" style="cursor:pointer;background:var(--navy);padding:8px 13px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap">Ppto No Cob. ⇅</th>
+          </tr></thead>
+          <tbody id="junio-fin-tbody"></tbody></table></div>
+        </div>
+      </div>
     </div>
   </div>
 </main>
@@ -567,8 +571,8 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
 <div class="sec-title" style="margin-top:20px">Comparativo por Institución</div>
 <div class="chart-card">
   <div class="chart-card-head"><h3>Cobrado + Débitos por Institución</h3><span>comparativo mensual en M$</span></div>
-  <div class="chart-body">
-    <canvas id="chart-inst" height="220"></canvas>
+  <div class="chart-body" style="height:300px">
+    <canvas id="chart-inst" height="300"></canvas>
   </div>
 </div>
 
@@ -1220,12 +1224,12 @@ async function loadJunio(){
       tr.onclick=()=>openJunioModal(inst);
       tr.innerHTML=`
         <td><span class="ib">${inst}</span></td>
-        <td class="r">${fmt(d.presup)}</td>
-        <td class="r cell-green">${fmt(d.neto)}</td>
-        <td class="r">${fmt(d.cobrado)}</td>
-        <td class="r cell-navy-light">${fmt(d.debitado)}</td>
+        <td class="r">${fmtFull(d.presup)}</td>
+        <td class="r cell-green">${fmtFull(d.neto)}</td>
+        <td class="r">${fmtFull(d.cobrado)}</td>
+        <td class="r cell-navy-light">${fmtFull(d.debitado)}</td>
         <td class="r">${pctBadge(pd)}</td>
-        <td class="r ${nc<=0?'cell-green':'cell-brown'}">${fmt(nc)}</td>`;
+        <td class="r ${nc<=0?'cell-green':'cell-brown'}">${fmtFull(nc)}</td>`;
       tbody.appendChild(tr);
       ncData.push({name:inst,val:nc});
     });
@@ -1289,6 +1293,9 @@ function renderJunioFin(){
   });
   const tbody=document.getElementById('junio-fin-tbody');
   tbody.innerHTML='';
+  // Update count
+  const countEl = document.getElementById('junio-fin-count');
+  if(countEl) countEl.textContent = `(${sorted.length} financiadores)`;
   sorted.forEach(d=>{
     const tr=document.createElement('tr');
     tr.innerHTML=`
