@@ -1413,6 +1413,7 @@ function buildComparativo(){
 
 <script>
 // == DEBITOS PAGE ==
+const fmtFull2=n=>Math.abs(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const DEB_COLORS = ['#0d1b2e','#1a6b5a','#2563a8','#b45309','#7c3aed','#0891b2'];
 const SEMAFORO = (pct) => pct >= 10 ? '#dc2626' : pct >= 5 ? '#d97706' : '#16a34a';
 const SEMAFORO_BG = (pct) => pct >= 10 ? '#fee2e2' : pct >= 5 ? '#fef3c7' : '#dcfce7';
@@ -1702,13 +1703,13 @@ window.showDebDetail = function(financiador){
       <td style="padding:6px 12px;font-size:11px"><span style="background:rgba(14,124,123,.15);color:#1a6b5a;padding:1px 6px;border-radius:3px;font-weight:600">${r.inst}</span></td>
       <td style="padding:6px 12px;font-size:11px;white-space:nowrap">${r.comprobante||'—'}</td>
       <td style="padding:6px 12px;font-size:11px;color:#6b7280;white-space:nowrap">${r.fecha_fact||'—'}</td>
-      <td style="padding:6px 12px;font-size:11px;text-align:right;font-variant-numeric:tabular-nums">${ad?fmtFull(ad):'—'}</td>
-      <td style="padding:6px 12px;font-size:11px;text-align:right;font-variant-numeric:tabular-nums;color:#b45309;font-weight:600">${deb?fmtFull(deb):'—'}</td>
+      <td style="padding:6px 12px;font-size:11px;text-align:right;font-variant-numeric:tabular-nums">${ad?fmtFull2(ad):'—'}</td>
+      <td style="padding:6px 12px;font-size:11px;text-align:right;font-variant-numeric:tabular-nums;color:#b45309;font-weight:600">${deb?fmtFull2(deb):'—'}</td>
       <td style="padding:6px 12px;font-size:11px;text-align:right;font-weight:600;color:${SEMAFORO(parseFloat(pct)||0)}">${pct}</td>
     </tr>`;
   }).join('');
 
-  footer.innerHTML = `${rows.length} comprobantes | Adeudado: $${fmtFull(totAd)} | Debitado: $${fmtFull(totDeb)} | %: ${totAd>0?(totDeb/totAd*100).toFixed(1)+'%':'—'}`;
+  footer.innerHTML = `${rows.length} comprobantes | Adeudado: $${fmtFull2(totAd)} | Debitado: $${fmtFull2(totDeb)} | %: ${totAd>0?(totDeb/totAd*100).toFixed(1)+'%':'—'}`;
   empty.style.display='none';
   wrap.style.display='block';
 };
