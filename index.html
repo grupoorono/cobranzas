@@ -346,6 +346,7 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
   <div class="page-tab active" onclick="switchPage('junio')">🔴 Junio 2026 <span style="font-size:10px;background:#dc2626;color:#fff;padding:1px 5px;border-radius:3px;margin-left:4px">EN VIVO</span></div>
   <div class="page-tab" onclick="switchPage('comparativo')">📈 Comparativo 2026</div>
   <div class="page-tab" onclick="switchPage('debitos')">⚠️ Análisis Débitos</div>
+  <div class="page-tab" onclick="switchPage('responsables')">👤 Responsables</div>
 </div>
 
 <div id="page-mensual" class="page-content">
@@ -694,6 +695,96 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
 </main>
 </div><!-- end page-debitos -->
 
+<!-- RESPONSABLES PAGE -->
+<div id="page-responsables" class="page-content">
+<main>
+  <div class="sec-title" style="display:flex;align-items:center;gap:10px">
+    Responsables — Junio 2026 EN VIVO
+    <span id="resp-update" style="font-size:10px;color:var(--gray-500);font-weight:400;text-transform:none;letter-spacing:0"></span>
+  </div>
+
+  <!-- Loading/error states -->
+  <div id="resp-loading" style="text-align:center;padding:60px 20px;color:var(--gray-500)">
+    <div style="font-size:32px;margin-bottom:12px">⏳</div>
+    <div style="font-size:14px;font-weight:500">Cargando datos de Responsables...</div>
+  </div>
+  <div id="resp-error" style="display:none;text-align:center;padding:60px 20px">
+    <div style="font-size:32px;margin-bottom:12px">⚠️</div>
+    <div style="font-size:14px;font-weight:500;color:#991b1b">No se pudieron cargar los datos</div>
+    <button onclick="loadResponsables()" style="margin-top:16px;background:var(--navy);color:#fff;border:none;padding:8px 20px;border-radius:5px;cursor:pointer;font-size:13px">🔄 Reintentar</button>
+  </div>
+
+  <div id="resp-content" style="display:none">
+
+    <!-- KPI resumen -->
+    <div class="kpi-row" id="resp-kpis"></div>
+
+    <!-- Ranking table -->
+    <div class="sec-title" style="margin-top:20px">Ranking por Presupuesto No Cobrado</div>
+    <div class="tc">
+      <div class="tc-head"><h3>Todos los Responsables</h3><span>click para ver detalle</span></div>
+      <table>
+        <thead><tr>
+          <th>Responsable</th>
+          <th class="r">Presupuestado</th>
+          <th class="r">Cobrado + Débitos</th>
+          <th class="r">% Cumpl.</th>
+          <th class="r">Cobrado</th>
+          <th class="r">Debitado</th>
+          <th class="r">% Déb.</th>
+          <th class="r">Ppto No Cobrado</th>
+        </tr></thead>
+        <tbody id="resp-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Drill-down -->
+    <div class="sec-title" style="margin-top:20px">Detalle por Responsable</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+
+      <!-- Financiadores -->
+      <div class="tc">
+        <div class="tc-head">
+          <h3 id="resp-detail-title">Seleccioná un responsable</h3>
+          <span>por financiador</span>
+        </div>
+        <div id="resp-detail-empty" style="padding:40px;text-align:center;color:var(--gray-500)">
+          <div style="font-size:24px;margin-bottom:8px">👆</div>
+          <div style="font-size:13px">Hacé click en un responsable para ver sus financiadores</div>
+        </div>
+        <div id="resp-fin-wrap" style="display:none;max-height:460px;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead style="position:sticky;top:0;background:var(--navy);z-index:5">
+              <tr>
+                <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase">Financiador</th>
+                <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:right;font-size:10px;text-transform:uppercase">Presupuestado</th>
+                <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:right;font-size:10px;text-transform:uppercase">Cobrado+Deb</th>
+                <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:right;font-size:10px;text-transform:uppercase">% Cumpl.</th>
+                <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:right;font-size:10px;text-transform:uppercase">No Cobrado</th>
+              </tr>
+            </thead>
+            <tbody id="resp-fin-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Instituciones chart -->
+      <div class="tc">
+        <div class="tc-head"><h3 id="resp-inst-title">Distribución por Institución</h3><span>presupuesto no cobrado</span></div>
+        <div style="padding:16px;display:none" id="resp-inst-empty">
+          <div style="text-align:center;color:var(--gray-500);padding:40px 0;font-size:13px">Seleccioná un responsable</div>
+        </div>
+        <div class="chart-body" style="padding:16px">
+          <canvas id="resp-inst-chart" height="220"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</main>
+</div><!-- end page-responsables -->
+
 
 <footer>Grupo Oroño · Datos al 29 de Mayo 2026</footer>
 
@@ -714,6 +805,10 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
   <div class="mbn-tab" onclick="switchPageMobile('debitos',this)" style="background:#1e3a5f">
     <div class="mbn-icon">⚠️</div>
     <div class="mbn-label">Débitos</div>
+  </div>
+  <div class="mbn-tab" onclick="switchPageMobile('responsables',this)" style="background:#1a3a2a">
+    <div class="mbn-icon">👤</div>
+    <div class="mbn-label">Responsables</div>
   </div>
 </div>
 <div class="modal-bg" id="modal">
@@ -1195,6 +1290,7 @@ function switchPageMobile(page, el){
   if(page==='comparativo' && !window._compBuilt){buildComparativo();window._compBuilt=true;}
   if(page==='junio' && !junioLoaded){loadJunio();}
   if(page==='debitos' && !window._debitosBuilt){buildDebitos();window._debitosBuilt=true;}
+  if(page==='responsables' && !window._respLoaded){loadResponsables();window._respLoaded=true;}
   window.scrollTo(0,0);
 }
 
@@ -1210,6 +1306,7 @@ function switchPage(page){
   }
   if(page==='junio' && !junioLoaded){loadJunio();}
   if(page==='debitos' && !window._debitosBuilt){buildDebitos();window._debitosBuilt=true;}
+  if(page==='responsables' && !window._respLoaded){loadResponsables();window._respLoaded=true;}
 }
 
 const fmtM=n=>{
@@ -1719,6 +1816,156 @@ window.showDebDetail = function(financiador){
   empty.style.display='none';
   wrap.style.display='block';
 };
+
+// == RESPONSABLES PAGE ==
+let respData = {};
+let respInstChart = null;
+
+async function loadResponsables(){
+  document.getElementById('resp-loading').style.display='block';
+  document.getElementById('resp-error').style.display='none';
+  document.getElementById('resp-content').style.display='none';
+
+  try{
+    const resp = await fetch(JUNIO_APPS_SCRIPT);
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    const rows = await resp.json();
+
+    // Group by responsable
+    const byResp = {};
+    rows.forEach(row=>{
+      const res  = String(row['Responsable']||'').trim();
+      if(!res || res==='' || res==='undefined') return;
+      const ad   = parseArg(row['Adeudado']);
+      const cob  = Math.abs(parseArg(row['Cobrado']));
+      const deb  = Math.abs(parseArg(row['Debitado']));
+      const net  = Math.abs(parseArg(row['Neto']));
+      const inst = String(row['Institucion']||'').trim();
+      const fin  = String(row['Financiador']||'').trim();
+      if(ad===0 && cob===0 && deb===0 && net===0) return;
+
+      if(!byResp[res]) byResp[res] = {presup:0,cobrado:0,debitado:0,neto:0,fins:{},insts:{}};
+      byResp[res].presup   += ad>0?ad:0;
+      byResp[res].cobrado  += cob;
+      byResp[res].debitado += deb>0?deb:0;
+      byResp[res].neto     += net;
+
+      // by financiador
+      if(fin){
+        if(!byResp[res].fins[fin]) byResp[res].fins[fin]={presup:0,neto:0};
+        byResp[res].fins[fin].presup += ad>0?ad:0;
+        byResp[res].fins[fin].neto   += net;
+      }
+      // by institucion
+      if(inst){
+        if(!byResp[res].insts[inst]) byResp[res].insts[inst]={presup:0,neto:0};
+        byResp[res].insts[inst].presup += ad>0?ad:0;
+        byResp[res].insts[inst].neto   += net;
+      }
+    });
+
+    respData = byResp;
+
+    // KPIs
+    const totalPresup = Object.values(byResp).reduce((a,v)=>a+v.presup,0);
+    const totalNeto   = Object.values(byResp).reduce((a,v)=>a+v.neto,0);
+    const totalDeb    = Object.values(byResp).reduce((a,v)=>a+v.debitado,0);
+    const totalNC     = totalPresup - totalNeto;
+    document.getElementById('resp-kpis').innerHTML=`
+      <div class="kpi-card"><div class="kpi-label">Responsables activos</div><div class="kpi-value" style="font-size:36px">${Object.keys(byResp).length}</div><div class="kpi-sub">Junio 2026</div></div>
+      <div class="kpi-card k-green"><div class="kpi-label">Total Cobrado + Débitos</div><div class="kpi-value">${fmt(totalNeto)}</div><span class="kpi-badge ${totalNeto>=totalPresup?'kb-green':'kb-red'}">${totalPresup?(totalNeto/totalPresup*100).toFixed(1)+'%':'—'} del presupuesto</span></div>
+      <div class="kpi-card k-amber"><div class="kpi-label">Total Debitado</div><div class="kpi-value">${fmt(totalDeb)}</div><span class="kpi-badge kb-amber">${totalNeto?(totalDeb/totalNeto*100).toFixed(1)+'%':'—'} sobre cobrado</span></div>
+      <div class="kpi-card ${totalNC>0?'k-blue':'k-green'}"><div class="kpi-label">Ppto No Cobrado</div><div class="kpi-value">${fmt(totalNC)}</div><div class="kpi-sub">${totalNC>0?'pendiente de cobro':'superó el presupuesto'}</div></div>`;
+
+    // Table
+    const tbody = document.getElementById('resp-tbody');
+    tbody.innerHTML='';
+    Object.entries(byResp)
+      .sort((a,b)=>(b[1].presup-b[1].neto)-(a[1].presup-a[1].neto))
+      .forEach(([res,d])=>{
+        const nc = d.presup - d.neto;
+        const pctCumpl = d.presup?(d.neto/d.presup*100):0;
+        const pctDeb = d.neto?(d.debitado/d.neto*100):0;
+        const tr = document.createElement('tr');
+        tr.style.cursor='pointer';
+        tr.onclick=()=>showRespDetail(res);
+        tr.innerHTML=`
+          <td><strong>${res}</strong></td>
+          <td class="r">${fmt(d.presup)}</td>
+          <td class="r cell-green">${fmt(d.neto)}</td>
+          <td class="r"><span style="font-weight:700;color:${pctCumpl>=100?'#166534':'#991b1b'};background:${pctCumpl>=100?'#dcfce7':'#fee2e2'};padding:2px 7px;border-radius:3px">${pctCumpl.toFixed(1)}%</span></td>
+          <td class="r">${fmt(d.cobrado)}</td>
+          <td class="r" style="color:#b45309">${fmt(d.debitado)}</td>
+          <td class="r"><span style="font-weight:600;color:${SEMAFORO(pctDeb)};background:${SEMAFORO_BG(pctDeb)};padding:2px 6px;border-radius:3px;font-size:11px">${pctDeb.toFixed(1)}%</span></td>
+          <td class="r ${nc>0?'cell-brown':'cell-green'}">${fmt(nc)}</td>`;
+        tbody.appendChild(tr);
+      });
+
+    const now = new Date();
+    document.getElementById('resp-update').textContent = `Última actualización: ${now.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`;
+    document.getElementById('resp-loading').style.display='none';
+    document.getElementById('resp-content').style.display='block';
+
+  } catch(err){
+    console.error(err);
+    document.getElementById('resp-loading').style.display='none';
+    document.getElementById('resp-error').style.display='block';
+    window._respLoaded = false;
+  }
+}
+
+function showRespDetail(resp){
+  const d = respData[resp];
+  if(!d) return;
+
+  document.getElementById('resp-detail-title').textContent = resp;
+  document.getElementById('resp-inst-title').textContent = resp + ' — por institución';
+
+  // Financiadores table
+  const finTbody = document.getElementById('resp-fin-tbody');
+  const fins = Object.entries(d.fins).sort((a,b)=>(b[1].presup-b[1].neto)-(a[1].presup-a[1].neto));
+  finTbody.innerHTML = fins.map(([fin,fd])=>{
+    const nc = fd.presup - fd.neto;
+    const pct = fd.presup?(fd.neto/fd.presup*100):0;
+    return `<tr style="border-bottom:1px solid var(--gray-200)">
+      <td style="padding:7px 12px;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${fin}">${fin}</td>
+      <td style="padding:7px 12px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">${fmt(fd.presup)}</td>
+      <td style="padding:7px 12px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums;color:#1a6b5a;font-weight:600">${fmt(fd.neto)}</td>
+      <td style="padding:7px 12px;font-size:12px;text-align:right"><span style="font-weight:700;color:${pct>=100?'#166534':'#991b1b'};font-size:11px">${pct.toFixed(1)}%</span></td>
+      <td style="padding:7px 12px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums;color:${nc>0?'#b45309':'#166534'};font-weight:600">${fmt(nc)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('resp-detail-empty').style.display='none';
+  document.getElementById('resp-fin-wrap').style.display='block';
+
+  // Instituciones chart
+  const insts = Object.entries(d.insts);
+  const labels = insts.map(([i])=>i);
+  const ncVals = insts.map(([,v])=>v.presup-v.neto);
+  const colors = ncVals.map(v=>v>0?'rgba(180,83,9,.7)':'rgba(26,107,90,.7)');
+  const borders = ncVals.map(v=>v>0?'#b45309':'#1a6b5a');
+
+  if(respInstChart) respInstChart.destroy();
+  respInstChart = new Chart(document.getElementById('resp-inst-chart'),{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'Cobrado+Deb',data:insts.map(([,v])=>v.neto/1e6),backgroundColor:'rgba(26,107,90,.6)',borderColor:'#1a6b5a',borderWidth:1.5,borderRadius:2},
+        {label:'No Cobrado',data:ncVals.map(v=>Math.max(0,v)/1e6),backgroundColor:'rgba(180,83,9,.6)',borderColor:'#b45309',borderWidth:1.5,borderRadius:2}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#374151',font:{size:11}},position:'bottom'}},
+      scales:{
+        x:{ticks:{color:'#374151',font:{size:11}},grid:{display:false}},
+        y:{min:0,ticks:{color:'#6b7280',font:{size:10},callback:v=>v.toLocaleString('es-AR')+' M'},grid:{color:'rgba(0,0,0,.06)'}}
+      }
+    }
+  });
+}
 
 function closeChartFS(){
   const overlay = document.getElementById('chart-fs-overlay');
