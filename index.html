@@ -1981,7 +1981,9 @@ function showRespDetail(resp){
   finTbody.innerHTML = fins.map(([fin,fd])=>{
     const nc = fd.presup - fd.neto;
     const pct = fd.presup?(fd.neto/fd.presup*100):0;
-    return `<tr style="border-bottom:1px solid var(--gray-200)">
+    return `<tr style="border-bottom:1px solid var(--gray-200);cursor:pointer" 
+      onmouseover="this.style.background='#f0f4f8'" onmouseout="this.style.background=''"
+      onclick="showRespInstByFin('${resp}','${fin.replace(/'/g,"\\'")}')">
       <td style="padding:7px 12px;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${fin}">${fin}</td>
       <td style="padding:7px 12px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">${fmt(fd.presup)}</td>
       <td style="padding:7px 12px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums;color:#1a6b5a;font-weight:600">${fmt(fd.neto)}</td>
@@ -2003,14 +2005,63 @@ function showRespDetail(resp){
   const colors = ncVals.map(v=>v>0?'rgba(180,83,9,.7)':'rgba(26,107,90,.7)');
   const borders = ncVals.map(v=>v>0?'#b45309':'#1a6b5a');
 
+  // Default chart shows all institutions for this responsable
+  showRespInstByFin(resp, null);
+}
+
+function showRespInstByFin(resp, fin){
+  const d = respData[resp];
+  if(!d) return;
+
+  // Highlight selected row
+  document.querySelectorAll('#resp-fin-tbody tr').forEach(tr=>{
+    const rowFin = tr.cells[0]?.title || tr.cells[0]?.textContent;
+    tr.style.background = (fin && rowFin===fin) ? '#e0f2fe' : '';
+  });
+
+  let labels, netoVals, ncVals, chartTitle;
+
+  if(!fin){
+    // Show all institutions for this responsable
+    chartTitle = resp + ' — por institución';
+    const insts = Object.entries(d.insts);
+    labels = insts.map(([i])=>i);
+    netoVals = insts.map(([,v])=>v.neto/1e6);
+    ncVals = insts.map(([,v])=>Math.max(0,v.presup-v.neto)/1e6);
+  } else {
+    // Show institutions for specific financiador of this responsable
+    chartTitle = fin.length>30?fin.substring(0,30)+'…':fin;
+    // Get inst breakdown from junio rows
+    const instData = {};
+    Object.keys(d.insts).forEach(inst=>{ instData[inst]={neto:0,presup:0}; });
+    // We need to look in junioData for this resp+fin combination
+    ['PARQUE','NIÑOS','ICR','CTC','CIBIC','GO FUNES'].forEach(inst=>{
+      const jd = junioData[inst];
+      if(!jd) return;
+      [...(jd.facturas||[]),...(jd.debitos||[])].forEach(r=>{
+        if(r.responsable===resp && r.financiador===fin){
+          if(!instData[inst]) instData[inst]={neto:0,presup:0};
+          instData[inst].presup += Math.abs(r.adeudado||0);
+          instData[inst].neto  += Math.abs(r.cobrado||0) + Math.abs(r.debitado||0);
+        }
+      });
+    });
+    const entries = Object.entries(instData).filter(([,v])=>v.presup>0||v.neto>0);
+    labels = entries.map(([i])=>i);
+    netoVals = entries.map(([,v])=>v.neto/1e6);
+    ncVals = entries.map(([,v])=>Math.max(0,v.presup-v.neto)/1e6);
+  }
+
+  document.getElementById('resp-inst-title').textContent = chartTitle;
+
   if(respInstChart) respInstChart.destroy();
   respInstChart = new Chart(document.getElementById('resp-inst-chart'),{
     type:'bar',
     data:{
       labels,
       datasets:[
-        {label:'Cobrado+Deb',data:insts.map(([,v])=>v.neto/1e6),backgroundColor:'rgba(26,107,90,.6)',borderColor:'#1a6b5a',borderWidth:1.5,borderRadius:2},
-        {label:'No Cobrado',data:ncVals.map(v=>Math.max(0,v)/1e6),backgroundColor:'rgba(180,83,9,.6)',borderColor:'#b45309',borderWidth:1.5,borderRadius:2}
+        {label:'Cobrado+Deb',data:netoVals,backgroundColor:'rgba(26,107,90,.6)',borderColor:'#1a6b5a',borderWidth:1.5,borderRadius:2},
+        {label:'No Cobrado',data:ncVals,backgroundColor:'rgba(180,83,9,.6)',borderColor:'#b45309',borderWidth:1.5,borderRadius:2}
       ]
     },
     options:{
