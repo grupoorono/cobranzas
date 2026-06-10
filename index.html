@@ -342,13 +342,13 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
 </header>
 
 <div class="page-tabs">
-  <div class="page-tab active" onclick="switchPage('mensual')">📊 Mayo 2026</div>
-  <div class="page-tab" onclick="switchPage('junio')">🔴 Junio 2026 <span style="font-size:10px;background:#dc2626;color:#fff;padding:1px 5px;border-radius:3px;margin-left:4px">EN VIVO</span></div>
+  <div class="page-tab" onclick="switchPage('mensual')">📊 Mayo 2026</div>
+  <div class="page-tab active" onclick="switchPage('junio')">🔴 Junio 2026 <span style="font-size:10px;background:#dc2626;color:#fff;padding:1px 5px;border-radius:3px;margin-left:4px">EN VIVO</span></div>
   <div class="page-tab" onclick="switchPage('comparativo')">📈 Comparativo 2026</div>
   <div class="page-tab" onclick="switchPage('debitos')">⚠️ Análisis Débitos</div>
 </div>
 
-<div id="page-mensual" class="page-content active">
+<div id="page-mensual" class="page-content">
 
 
 <!-- KPIs -->
@@ -440,7 +440,7 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
 </div><!-- end page-mensual -->
 
 <!-- JUNIO EN VIVO -->
-<div id="page-junio" class="page-content">
+<div id="page-junio" class="page-content active">
 <main>
   <div class="sec-title" style="display:flex;align-items:center;gap:10px">
     Junio 2026 — Datos en tiempo real
@@ -703,7 +703,7 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
     <div class="mbn-icon">📊</div>
     <div class="mbn-label">Mayo</div>
   </div>
-  <div class="mbn-tab" onclick="switchPageMobile('junio',this)" style="background:#7f1d1d">
+  <div class="mbn-tab active" onclick="switchPageMobile('junio',this)" style="background:#7f1d1d">
     <div class="mbn-icon">🔴</div>
     <div class="mbn-label">Junio</div>
   </div>
@@ -864,7 +864,12 @@ ncData.forEach(d=>{
 });
 
 // Animate
-window.addEventListener('load',()=>setTimeout(()=>document.querySelectorAll('.br-fill[data-w]').forEach(el=>el.style.width=el.dataset.w+'%'),100));
+// Animate bars on load and auto-load Junio
+window.addEventListener('load',()=>{
+  setTimeout(()=>document.querySelectorAll('.br-fill[data-w]').forEach(el=>el.style.width=el.dataset.w+'%'),100);
+  // Auto-load Junio since it's the default page
+  if(!junioLoaded){ loadJunio(); }
+});
 
 // MODAL
 let currentInst='',currentTab='facturas',currentData=[];
