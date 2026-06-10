@@ -1649,7 +1649,8 @@ function buildDebitosCharts(){
     });
   }
   renderFinChart(D.all_fins[0]);
-  select.addEventListener('change',function(){renderFinChart(this.value);});
+  const finSelect = document.getElementById('deb-fin-select');
+  if(finSelect) finSelect.addEventListener('change',function(){renderFinChart(this.value);});
 }
 
 // Detail panel for debitos ranking
