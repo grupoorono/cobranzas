@@ -587,16 +587,8 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
 
 </div>
 
-<div class="sec-title" style="margin-top:20px">Comparativo por Institución</div>
-<div class="chart-card">
-  <div class="chart-card-head"><h3>Cobrado + Débitos por Institución</h3><span>comparativo mensual en M$</span></div>
-  <div class="chart-body" style="height:260px;width:100%">
-    <canvas id="chart-inst"></canvas>
-  </div>
-</div>
-
 <div class="sec-title" style="margin-top:20px">Detalle por Institución y Mes</div>
-<div id="inst-comp-tables" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
+<div id="inst-comp-tables" style="display:grid;grid-template-columns:1fr;gap:12px"></div>
 
 </main>
 </div><!-- end page-comparativo -->
@@ -620,12 +612,6 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
       <div class="chart-body"><canvas id="deb-chart-pct" height="200" style="min-height:200px"></canvas></div>
     </div>
   </div>
-  <div class="sec-title" style="margin-top:16px">Evolución por Institución</div>
-  <div class="chart-card">
-    <div class="chart-card-head"><h3>Débitos por Institución</h3><span>comparativo mensual en M$</span></div>
-    <div class="chart-body"><canvas id="deb-chart-inst" height="200"></canvas></div>
-  </div>
-
   <!-- 2. Evolución por Financiador (drill-down) -->
   <div class="sec-title" style="margin-top:20px">2. Evolución por Financiador</div>
   <div class="tc">
@@ -1663,20 +1649,6 @@ function buildComparativo(){
   });
 
   // ── CHART 5: Por institución ──
-  new Chart(document.getElementById('chart-inst'),{
-    type:'bar',
-    data:{
-      labels:months,
-      datasets:getInsts().map((inst,i)=>{ const i2=ALL_INSTS.indexOf(inst); return {
-        label:inst,
-        data:months.map(m=>MONTHLY_DATA[m][inst]?MONTHLY_DATA[m][inst].neto/1e6:null),
-        backgroundColor:COLORS_LIGHT[i2].replace('.15)','.7)'),
-        borderColor:COLORS[i2],borderWidth:1.5,borderRadius:2
-      };})
-    },
-    options:{...chartDefaults,responsive:true,maintainAspectRatio:false,plugins:{...chartDefaults.plugins,legend:{...chartDefaults.plugins.legend,position:'bottom'}},scales:{...chartDefaults.scales,x:{...chartDefaults.scales.x,stacked:false},y:{...chartDefaults.scales.y,ticks:{...chartDefaults.scales.y.ticks,callback:v=>v.toLocaleString('es-AR')+' M'}}}}
-  });
-
   // ── PER-INST TABLES ──
   const wrap = document.getElementById('inst-comp-tables');
   getInsts().forEach((inst,ci)=>{
@@ -1719,8 +1691,7 @@ function buildComparativo(){
       [['chart-trend','Cobrado + Débitos vs Presupuestado'],
        ['chart-pct','% Cumplimiento del Presupuesto'],
        ['chart-deb','Importe Debitado'],
-       ['chart-pctdeb','% Débitos sobre Cobrado'],
-       ['chart-inst','Por Institución']
+       ['chart-pctdeb','% Débitos sobre Cobrado']
       ].forEach(([id,title])=>{
         const canvas = document.getElementById(id);
         if(!canvas) return;
@@ -1779,11 +1750,15 @@ function buildDebitos(){
   const D = DEBITOS_DATA;
   const select = document.getElementById('deb-fin-select');
   if(select && !select.options.length){
-    D.all_fins.forEach(fin=>{
+    const todos = document.createElement('option');
+    todos.value='__ALL__'; todos.textContent='TODOS los financiadores';
+    select.appendChild(todos);
+    [...D.all_fins].sort((a,b)=>a.localeCompare(b)).forEach(fin=>{
       const opt = document.createElement('option');
       opt.value=fin; opt.textContent=fin.length>40?fin.substring(0,40)+'...':fin;
       select.appendChild(opt);
     });
+    select.value='__ALL__';
   }
   // Wait for DOM to be visible using requestAnimationFrame + small delay
   requestAnimationFrame(()=>{
@@ -1841,20 +1816,14 @@ function buildDebitosCharts(){
     options:{...chartOpts,scales:{...chartOpts.scales,y:{...chartOpts.scales.y,ticks:{...chartOpts.scales.y.ticks,callback:v=>parseFloat(v.toFixed(2))+'%'}}}}
   });
 
-  // Chart 3: inst evolution
-  const INST_D = D.inst.filter(i=>getInsts().includes(i));
-  new Chart(document.getElementById('deb-chart-inst'),{
-    type:'bar',
-    data:{labels:MESES_D,datasets:INST_D.map((inst)=>{ const i=D.inst.indexOf(inst); return {
-      label:inst,
-      data:MESES_D.map(m=>D.monthly_inst[m]&&D.monthly_inst[m][inst]?D.monthly_inst[m][inst].deb/1e6:0),
-      backgroundColor:DEB_COLORS[i]+'aa',borderColor:DEB_COLORS[i],borderWidth:1.5,borderRadius:2
-    };})},
-    options:{...chartOpts,plugins:{...chartOpts.plugins,legend:{...chartOpts.plugins.legend,position:'bottom'}},scales:{...chartOpts.scales,y:{...chartOpts.scales.y,min:0,ticks:{...chartOpts.scales.y.ticks,callback:v=>v.toLocaleString('es-AR')+' M'}}}}
-  });
-
   // Ranking — with month filter
   let rankingChart = null;
+  let rankSortCol = 2, rankSortAsc = false; // por defecto: % descendente
+  window.rankSort = function(col){
+    if(rankSortCol===col){ rankSortAsc=!rankSortAsc; }
+    else { rankSortCol=col; rankSortAsc = (col===0); } // texto asc por defecto, números desc
+    renderRanking();
+  };
   window.renderRanking = function(){
     const mes = document.getElementById('deb-mes-ranking')?.value || '';
     const inst = document.getElementById('deb-inst-ranking')?.value || '';
@@ -1887,18 +1856,43 @@ function buildDebitosCharts(){
       });
       const pct = totalCn > 0 ? totalDeb/totalCn*100 : 0;
       return {f:fin, deb:Math.round(totalDeb), pct:parseFloat(pct.toFixed(2))};
-    }).filter(d=>d.deb>0).sort((a,b)=>b.pct-a.pct);
+    }).filter(d=>d.deb>0);
+
+    // Ordenar según la columna elegida
+    fins.sort((a,b)=>{
+      let av,bv;
+      if(rankSortCol===0){ av=a.f; bv=b.f; return rankSortAsc?av.localeCompare(bv):bv.localeCompare(av); }
+      if(rankSortCol===1){ av=a.deb; bv=b.deb; } else { av=a.pct; bv=b.pct; }
+      return rankSortAsc? av-bv : bv-av;
+    });
+
+    const arrow = (col)=> rankSortCol===col ? (rankSortAsc?' ↑':' ↓') : ' ⇅';
+    const thBase = 'padding:8px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,.85);cursor:pointer;white-space:nowrap;background:var(--navy)';
 
     const rankingWrap = document.getElementById('deb-ranking');
-    rankingWrap.innerHTML = fins.map(d=>`
-      <div data-fin="${d.f.replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--gray-200);cursor:pointer;transition:background .1s;white-space:nowrap;min-width:0" 
-           onmouseover="this.style.background='#f0f4f8'" onmouseout="this.style.background=''"
-           onclick="showDebDetail('${d.f.replace(/'/g,"\\'")}')">
-        <span style="width:16px;font-size:13px;flex-shrink:0">${SEMAFORO_LABEL(d.pct)}</span>
-        <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0" title="${d.f}">${d.f}</span>
-        <span style="font-size:11px;color:var(--gray-500);width:70px;text-align:right;flex-shrink:0">${fmt(d.deb)}</span>
-        <span style="font-size:11px;font-weight:700;color:${SEMAFORO(d.pct)};background:${SEMAFORO_BG(d.pct)};padding:2px 7px;border-radius:3px;width:58px;text-align:center;flex-shrink:0">${d.pct.toFixed(1)}%</span>
-      </div>`).join('');
+    rankingWrap.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead style="position:sticky;top:0;z-index:5">
+          <tr>
+            <th onclick="rankSort(0)" style="${thBase};text-align:left">Financiador${arrow(0)}</th>
+            <th onclick="rankSort(1)" style="${thBase};text-align:right">Monto Debitado${arrow(1)}</th>
+            <th onclick="rankSort(2)" style="${thBase};text-align:center">%${arrow(2)}</th>
+          </tr>
+        </thead>
+        <tbody>
+        ${fins.map(d=>`
+          <tr data-fin="${d.f.replace(/"/g,'&quot;')}" style="border-bottom:1px solid var(--gray-200);cursor:pointer"
+              onmouseover="this.style.background='#f0f4f8'" onmouseout="this.style.background=''">
+            <td style="padding:7px 12px;font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.f}">
+              <span style="margin-right:6px">${SEMAFORO_LABEL(d.pct)}</span>${d.f}
+            </td>
+            <td style="padding:7px 12px;font-size:11px;color:var(--gray-600);text-align:right;white-space:nowrap">${fmt(d.deb)}</td>
+            <td style="padding:7px 12px;text-align:center;white-space:nowrap">
+              <span style="font-size:11px;font-weight:700;color:${SEMAFORO(d.pct)};background:${SEMAFORO_BG(d.pct)};padding:2px 7px;border-radius:3px">${d.pct.toFixed(1)}%</span>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
 
     // Make ranking rows clickable — show comprobantes detail
     rankingWrap.querySelectorAll && setTimeout(()=>{
@@ -1982,7 +1976,18 @@ function buildDebitosCharts(){
   let finChart = null;
   function renderFinChart(fin){
     if(finChart){finChart.destroy(); finChart=null;}
-    const d = D.all_fins_evo[fin];
+    let d;
+    if(fin==='__ALL__'){
+      // Sumar todos los financiadores por mes
+      d={};
+      MESES_D.forEach(m=>{
+        let deb=0, neto=0;
+        D.all_fins.forEach(f=>{ const e=D.all_fins_evo[f]?.[m]; if(e){ deb+=e.deb; neto+=e.neto; } });
+        d[m]={deb, neto, pct: neto>0? parseFloat((deb/neto*100).toFixed(2)) : 0};
+      });
+    } else {
+      d = D.all_fins_evo[fin];
+    }
     if(!d) return;
     finChart = new Chart(document.getElementById('deb-chart-fin'),{
       type:'line',
@@ -2003,7 +2008,7 @@ function buildDebitosCharts(){
         }}
     });
   }
-  renderFinChart(D.all_fins[0]);
+  renderFinChart('__ALL__');
   const finSelect = document.getElementById('deb-fin-select');
   if(finSelect) finSelect.addEventListener('change',function(){renderFinChart(this.value);});
 }
