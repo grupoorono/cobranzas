@@ -971,14 +971,23 @@ function pctBadge(p){
   return`<span class="pct-ok">${p.toFixed(2)}%</span>`;
 }
 
-// Inst buttons
+// Inst buttons — ahora filtran toda la hoja (BI). Las filas de la tabla siguen abriendo el detalle.
 const btnWrap=document.getElementById('inst-btns');
-INST.forEach(d=>{
-  const b=document.createElement('button');
-  b.className='inst-btn';b.textContent=d.name;
-  b.onclick=()=>openModal(d.name);
-  btnWrap.appendChild(b);
-});
+btnWrap.innerHTML='';
+(function(){
+  const allowedB=getAllowedInsts();
+  const mkBtn=(label,val)=>{
+    const b=document.createElement('button');
+    b.className='inst-btn';
+    b.textContent=label;
+    const isActive = (val==='' && !window._activeInst) || (val && window._activeInst===val);
+    if(isActive){ b.style.background='var(--navy)'; b.style.color='#fff'; b.style.borderColor='var(--navy)'; }
+    b.onclick=()=>setActiveInst(val);
+    return b;
+  };
+  if(allowedB.length>1) btnWrap.appendChild(mkBtn('Todas',''));
+  allowedB.forEach(name=>btnWrap.appendChild(mkBtn(name,name)));
+})();
 
 // Inst table — replicar estilo PBI con celdas de color
 const itbody=document.getElementById('inst-tbody');
@@ -1317,16 +1326,23 @@ async function loadJunio(){
       ncData.push({name:inst,val:nc});
     });
 
-    // Inst buttons
+    // Inst buttons — filtran toda la hoja (BI). Las filas de la tabla siguen abriendo el detalle.
     const btnWrap=document.getElementById('junio-inst-btns');
     btnWrap.innerHTML='';
-    instOrder.forEach(inst=>{
-      if(!junioData[inst]) return;
-      const b=document.createElement('button');
-      b.className='inst-btn';b.textContent=inst;
-      b.onclick=()=>openJunioModal(inst);
-      btnWrap.appendChild(b);
-    });
+    (function(){
+      const allowedB=getAllowedInsts();
+      const mkBtn=(label,val)=>{
+        const b=document.createElement('button');
+        b.className='inst-btn';
+        b.textContent=label;
+        const isActive=(val===''&&!window._activeInst)||(val&&window._activeInst===val);
+        if(isActive){ b.style.background='var(--navy)'; b.style.color='#fff'; b.style.borderColor='var(--navy)'; }
+        b.onclick=()=>setActiveInst(val);
+        return b;
+      };
+      if(allowedB.length>1) btnWrap.appendChild(mkBtn('Todas',''));
+      allowedB.forEach(name=>btnWrap.appendChild(mkBtn(name,name)));
+    })();
 
     // NC bars
     const maxNC=Math.max(...ncData.map(d=>Math.abs(d.val)));
@@ -2352,6 +2368,8 @@ function showApp(){
 
 function logout(){
   sessionStorage.removeItem('go_session');
+  sessionStorage.removeItem('go_active_inst');
+  sessionStorage.removeItem('go_active_tab');
   window.location.replace('login.html');
 }
 
