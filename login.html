@@ -47,9 +47,10 @@ body{background:#0d1b2e;min-height:100vh;display:flex;align-items:center;justify
 </div>
 
 <script>
-const AUTH_URL = 'https://script.google.com/macros/s/AKfycbw9S5Hq7pqN3UH6pzBK_fQs_da60UzZ70WBp9jiO-zOONPkjVwtLr9VJxXoWxxl9nwR/exec';
+const SUPA_URL = 'https://ycbhlgbubkryorfejodn.supabase.co';
+const SUPA_KEY = 'sb_publishable_p2irR-kgmz4sRMSi4zW2fw_tUNC1djU';
 
-// If already logged in, go to dashboard
+// Si ya tiene sesión va directo al dashboard
 if(sessionStorage.getItem('go_session')){
   window.location.replace('index.html');
 }
@@ -57,7 +58,7 @@ if(sessionStorage.getItem('go_session')){
 async function doLogin(){
   const btn = document.getElementById('btn');
   const err = document.getElementById('err');
-  const user = document.getElementById('user').value.trim();
+  const user = document.getElementById('user').value.trim().toLowerCase();
   const pass = document.getElementById('pass').value.trim();
 
   if(!user || !pass){ showErr('Completá usuario y contraseña'); return; }
@@ -67,20 +68,40 @@ async function doLogin(){
   err.style.display = 'none';
 
   try{
-    const resp = await fetch(AUTH_URL, {
-      method: 'POST',
-      body: JSON.stringify({usuario: user, password: pass}),
-      headers: {'Content-Type': 'application/json'}
-    });
+    // Query Supabase for matching user
+    const resp = await fetch(
+      `${SUPA_URL}/rest/v1/usuarios?usuario=eq.${encodeURIComponent(user)}&select=*`,
+      { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` } }
+    );
     const data = await resp.json();
 
-    if(data.ok){
-      sessionStorage.setItem('go_session', JSON.stringify(data));
-      window.location.replace('index.html');
-    } else {
-      showErr(data.error || 'Usuario o contraseña incorrectos');
-    }
+    if(!data.length){ showErr('Usuario o contraseña incorrectos'); btn.textContent='Ingresar'; btn.disabled=false; return; }
+
+    const u = data[0];
+
+    if(u.password !== pass){ showErr('Usuario o contraseña incorrectos'); btn.textContent='Ingresar'; btn.disabled=false; return; }
+    if(!u.activo){ showErr('Usuario inactivo. Contactá al administrador.'); btn.textContent='Ingresar'; btn.disabled=false; return; }
+
+    // Save session
+    sessionStorage.setItem('go_session', JSON.stringify({
+      id: u.id,
+      usuario: u.usuario,
+      tipo: u.tipo,
+      instituciones: {
+        PARQUE:   u.parque,
+        NIÑOS:    u.ninos,
+        ICR:      u.icr,
+        CTC:      u.ctc,
+        CIBIC:    u.cibic,
+        GO_FUNES: u.go_funes
+      },
+      pestañas: u.pestanas || 'todas'
+    }));
+
+    window.location.replace('index.html');
+
   } catch(e){
+    console.error(e);
     showErr('Error de conexión. Verificá tu internet.');
   }
 

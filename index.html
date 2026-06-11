@@ -2135,10 +2135,15 @@ function closeChartFS(){
 
 
 <script>
-const AUTH_URL = 'https://script.google.com/macros/s/AKfycbw9S5Hq7pqN3UH6pzBK_fQs_da60UzZ70WBp9jiO-zOONPkjVwtLr9VJxXoWxxl9nwR/exec';
+const SUPA_URL = 'https://ycbhlgbubkryorfejodn.supabase.co';
+const SUPA_KEY = 'sb_publishable_p2irR-kgmz4sRMSi4zW2fw_tUNC1djU';
 let currentUser = null;
 
-// Check session
+async function supaFetch(path, opts={}){
+  const headers = {'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`, 'Content-Type': 'application/json', ...opts.headers};
+  return fetch(`${SUPA_URL}/rest/v1/${path}`, {...opts, headers});
+}
+
 window.addEventListener('load', ()=>{
   const saved = sessionStorage.getItem('go_session');
   if(saved){
@@ -2155,49 +2160,7 @@ window.addEventListener('load', ()=>{
   }
 });
 
-async function doLogin(){
-  const btn = document.getElementById('login-btn');
-  const errDiv = document.getElementById('login-error');
-  const user = document.getElementById('login-user').value.trim();
-  const pass = document.getElementById('login-pass').value.trim();
-
-  if(!user || !pass){ showLoginError('Completá usuario y contraseña'); return; }
-
-  btn.textContent = 'Verificando...';
-  btn.disabled = true;
-  errDiv.style.display = 'none';
-
-  try{
-    const resp = await fetch(AUTH_URL, {
-      method: 'POST',
-      body: JSON.stringify({usuario: user, password: pass}),
-      headers: {'Content-Type': 'application/json'}
-    });
-    const data = await resp.json();
-
-    if(data.ok){
-      currentUser = data;
-      sessionStorage.setItem('go_session', JSON.stringify(data));
-      applyPermissions(data);
-      showApp();
-    } else {
-      showLoginError(data.error || 'Usuario o contraseña incorrectos');
-    }
-  } catch(e){
-    showLoginError('Error de conexión. Verificá tu internet.');
-  }
-  btn.textContent = 'Ingresar';
-  btn.disabled = false;
-}
-
-function showLoginError(msg){
-  const errDiv = document.getElementById('login-error');
-  errDiv.textContent = msg;
-  errDiv.style.display = 'block';
-}
-
 function showApp(){
-  // Show user info in header
   const headerRight = document.querySelector('.header-right');
   if(headerRight && currentUser){
     const userInfo = document.createElement('div');
@@ -2216,9 +2179,7 @@ function logout(){
 }
 
 function applyPermissions(user){
-  if(user.tipo === 'admin' || user.tipo === 'generico') return; // see everything
-
-  // Hide tabs based on pestañas permission
+  if(user.tipo === 'admin' || user.tipo === 'generico') return;
   const tabMap = {
     'anterior': "switchPage('mensual')",
     'actual': "switchPage('junio')",
@@ -2227,7 +2188,6 @@ function applyPermissions(user){
     'responsables': "switchPage('responsables')"
   };
   const allowed = user.pestañas === 'todas' ? Object.keys(tabMap) : user.pestañas.split(',').map(t=>t.trim());
-
   document.querySelectorAll('.page-tab').forEach(tab=>{
     const onclick = tab.getAttribute('onclick')||'';
     const key = Object.keys(tabMap).find(k=>tabMap[k]===onclick);
@@ -2242,51 +2202,56 @@ function applyPermissions(user){
     });
     if(key && !allowed.includes(key)) tab.style.display='none';
   });
-
-  // Filter institutions in tables - hide rows of institutions user can't see
-  const instPermissions = user.instituciones || {};
-  const allowedInsts = Object.entries(instPermissions).filter(([,v])=>v).map(([k])=>k.replace('_',' '));
-
-  // Apply inst filter when data loads
-  window._instFilter = allowedInsts;
+  window._instFilter = Object.entries(user.instituciones||{}).filter(([,v])=>v).map(([k])=>k.replace('_',' '));
 }
 
 // ── ADMIN PANEL ──
 function showAdminPanel(){
   let modal = document.getElementById('admin-modal');
-  if(!modal){
-    modal = document.createElement('div');
-    modal.id = 'admin-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:flex;align-items:center;justify-content:center';
-    modal.innerHTML = `
-      <div style="background:#192840;border-radius:12px;width:min(96vw,900px);max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5)">
-        <div style="background:var(--navy);padding:16px 22px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+  if(modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'admin-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:#192840;border-radius:12px;width:min(96vw,960px);max-height:92vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+      <div style="background:var(--navy);padding:16px 22px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:16px">
           <span style="color:#fff;font-size:15px;font-weight:600">⚙️ Panel de Administración</span>
-          <button onclick="document.getElementById('admin-modal').remove()" style="background:rgba(255,255,255,.1);border:none;color:#fff;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:14px">✕</button>
+          <button onclick="showAdminTab('usuarios')" id="atab-usuarios" style="background:rgba(255,255,255,.2);border:none;color:#fff;padding:5px 14px;border-radius:4px;cursor:pointer;font-size:12px;font-family:Inter,sans-serif">👥 Usuarios</button>
+          <button onclick="showAdminTab('config')" id="atab-config" style="background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.6);padding:5px 14px;border-radius:4px;cursor:pointer;font-size:12px;font-family:Inter,sans-serif">⚙️ Configuración</button>
         </div>
-        <div style="overflow-y:auto;flex:1;padding:22px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-            <span style="color:#e0eaf4;font-weight:600;font-size:14px">Usuarios registrados</span>
-            <button onclick="showAddUser()" style="background:#0e7c7b;border:none;color:#fff;padding:7px 16px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600">+ Nuevo usuario</button>
-          </div>
-          <div id="admin-users-list" style="color:rgba(255,255,255,.6);text-align:center;padding:20px">Cargando...</div>
-        </div>
-      </div>`;
-    document.body.appendChild(modal);
-    modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
-  }
-  loadAdminUsers();
+        <button onclick="document.getElementById('admin-modal').remove()" style="background:rgba(255,255,255,.1);border:none;color:#fff;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:14px">✕</button>
+      </div>
+      <div style="overflow-y:auto;flex:1;padding:22px" id="admin-content">Cargando...</div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
+  showAdminTab('usuarios');
+}
+
+function showAdminTab(tab){
+  document.getElementById('atab-usuarios').style.background = tab==='usuarios'?'rgba(255,255,255,.2)':'rgba(255,255,255,.08)';
+  document.getElementById('atab-usuarios').style.color = tab==='usuarios'?'#fff':'rgba(255,255,255,.6)';
+  document.getElementById('atab-config').style.background = tab==='config'?'rgba(255,255,255,.2)':'rgba(255,255,255,.08)';
+  document.getElementById('atab-config').style.color = tab==='config'?'#fff':'rgba(255,255,255,.6)';
+  if(tab==='usuarios') loadAdminUsers();
+  else loadAdminConfig();
 }
 
 async function loadAdminUsers(){
-  const list = document.getElementById('admin-users-list');
-  if(!list) return;
-  list.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:20px;text-align:center">Cargando usuarios...</div>';
+  const content = document.getElementById('admin-content');
+  content.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:20px;text-align:center">Cargando usuarios...</div>';
   try{
-    const resp = await fetch(AUTH_URL+'?action=list&admin='+encodeURIComponent(currentUser.usuario));
-    const data = await resp.json();
-    if(!data.users){ list.innerHTML='<div style="color:#f87171;padding:20px">Error al cargar usuarios</div>'; return; }
-    list.innerHTML = `
+    const resp = await supaFetch('usuarios?select=*&order=tipo,usuario');
+    const users = await resp.json();
+    const INSTS = ['parque','ninos','icr','ctc','cibic','go_funes'];
+    const INST_LABELS = ['PARQUE','NIÑOS','ICR','CTC','CIBIC','GO FUNES'];
+    content.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <span style="color:#e0eaf4;font-weight:600;font-size:14px">Usuarios (${users.length})</span>
+        <button onclick="showUserForm()" style="background:#0e7c7b;border:none;color:#fff;padding:7px 16px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600;font-family:Inter,sans-serif">+ Nuevo usuario</button>
+      </div>
+      <div id="user-form-wrap"></div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="background:var(--navy)">
           <th style="padding:8px 12px;color:rgba(255,255,255,.7);text-align:left;font-size:10px;text-transform:uppercase">Usuario</th>
@@ -2296,93 +2261,160 @@ async function loadAdminUsers(){
           <th style="padding:8px 12px;color:rgba(255,255,255,.7);text-align:center;font-size:10px;text-transform:uppercase">Activo</th>
           <th style="padding:8px 12px;color:rgba(255,255,255,.7);text-align:center;font-size:10px;text-transform:uppercase">Acciones</th>
         </tr></thead>
-        <tbody>${data.users.map((u,i)=>`
-          <tr style="border-bottom:1px solid rgba(255,255,255,.07)">
-            <td style="padding:8px 12px;color:#e0eaf4;font-weight:500">${u[0]}</td>
-            <td style="padding:8px 12px"><span style="background:${u[2]==='admin'?'rgba(14,124,123,.3)':u[2]==='generico'?'rgba(37,99,168,.3)':'rgba(255,255,255,.1)'};color:${u[2]==='admin'?'#14a8a7':u[2]==='generico'?'#60a5fa':'#9ca3af'};padding:2px 8px;border-radius:3px;font-size:11px">${u[2]}</span></td>
-            <td style="padding:8px 12px;color:rgba(255,255,255,.6);font-size:11px">${[u[3],u[4],u[5],u[6],u[7],u[8]].map((v,j)=>v==='TRUE'||v===true?['PARQUE','NIÑOS','ICR','CTC','CIBIC','GO FUNES'][j]:'').filter(Boolean).join(', ')||'Ninguna'}</td>
-            <td style="padding:8px 12px;color:rgba(255,255,255,.6);font-size:11px">${u[9]||'todas'}</td>
-            <td style="padding:8px 12px;text-align:center">${(u[10]==='TRUE'||u[10]===true||u[10]===undefined)?'<span style="color:#4ade80">●</span>':'<span style="color:#f87171">●</span>'}</td>
-            <td style="padding:8px 12px;text-align:center">
-              <button onclick="editUser(${i+1})" style="background:rgba(255,255,255,.1);border:none;color:#fff;padding:3px 8px;border-radius:3px;cursor:pointer;font-size:11px;margin-right:4px">✏️</button>
+        <tbody>
+          ${users.map(u=>`
+          <tr style="border-bottom:1px solid rgba(255,255,255,.07)" id="urow-${u.id}">
+            <td style="padding:8px 12px;color:#e0eaf4;font-weight:500">${u.usuario}</td>
+            <td style="padding:8px 12px"><span style="background:${u.tipo==='admin'?'rgba(14,124,123,.3)':u.tipo==='generico'?'rgba(37,99,168,.3)':'rgba(255,255,255,.1)'};color:${u.tipo==='admin'?'#14a8a7':u.tipo==='generico'?'#60a5fa':'#9ca3af'};padding:2px 8px;border-radius:3px;font-size:11px">${u.tipo}</span></td>
+            <td style="padding:8px 12px;color:rgba(255,255,255,.6);font-size:11px">${INSTS.filter((_,i)=>u[INSTS[i]]).map((_,i)=>INST_LABELS[i]).join(', ')||'Ninguna'}</td>
+            <td style="padding:8px 12px;color:rgba(255,255,255,.6);font-size:11px">${u.pestanas||'todas'}</td>
+            <td style="padding:8px 12px;text-align:center"><span style="color:${u.activo?'#4ade80':'#f87171'};font-size:16px">${u.activo?'●':'○'}</span></td>
+            <td style="padding:8px 12px;text-align:center;display:flex;gap:6px;justify-content:center">
+              <button onclick="editUser(${u.id})" style="background:rgba(255,255,255,.1);border:none;color:#fff;padding:3px 8px;border-radius:3px;cursor:pointer;font-size:11px">✏️</button>
+              <button onclick="toggleUser(${u.id},${u.activo})" style="background:${u.activo?'rgba(201,64,64,.2)':'rgba(74,222,128,.2)'};border:none;color:${u.activo?'#f87171':'#4ade80'};padding:3px 8px;border-radius:3px;cursor:pointer;font-size:11px">${u.activo?'Desactivar':'Activar'}</button>
             </td>
           </tr>`).join('')}
         </tbody>
       </table>`;
   } catch(e){
-    list.innerHTML='<div style="color:#f87171;padding:20px">Error de conexión</div>';
+    document.getElementById('admin-content').innerHTML='<div style="color:#f87171;padding:20px">Error al cargar usuarios</div>';
   }
 }
 
-function showAddUser(){
-  const instOpts = ['PARQUE','NIÑOS','ICR','CTC','CIBIC','GO_FUNES'];
-  const tabOpts = ['anterior','actual','comparativo','debitos','responsables'];
-  const form = `
-    <div style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;display:flex;align-items:center;justify-content:center" id="add-user-modal">
-      <div style="background:#192840;border-radius:10px;width:min(94vw,480px);padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.5)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-          <span style="color:#fff;font-weight:600;font-size:15px">Nuevo Usuario</span>
-          <button onclick="document.getElementById('add-user-modal').remove()" style="background:none;border:none;color:rgba(255,255,255,.5);font-size:18px;cursor:pointer">✕</button>
+async function toggleUser(id, activo){
+  await supaFetch(`usuarios?id=eq.${id}`, {method:'PATCH', body:JSON.stringify({activo:!activo})});
+  loadAdminUsers();
+}
+
+function showUserForm(userData){
+  const INSTS = ['parque','ninos','icr','ctc','cibic','go_funes'];
+  const INST_LABELS = ['PARQUE','NIÑOS','ICR','CTC','CIBIC','GO FUNES'];
+  const TABS = ['anterior','actual','comparativo','debitos','responsables'];
+  const u = userData || {};
+  const isEdit = !!u.id;
+  const pestanas = u.pestanas ? u.pestanas.split(',').map(t=>t.trim()) : TABS;
+
+  const wrap = document.getElementById('user-form-wrap');
+  wrap.innerHTML = `
+    <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:20px;margin-bottom:20px">
+      <div style="color:#fff;font-weight:600;font-size:13px;margin-bottom:14px">${isEdit?'Editar usuario':'Nuevo usuario'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <label style="font-size:11px;color:rgba(255,255,255,.5);display:block;margin-bottom:4px">Usuario</label>
+          <input id="uf-user" value="${u.usuario||''}" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:8px 10px;color:#fff;font-size:13px;box-sizing:border-box;font-family:Inter,sans-serif">
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-          <div>
-            <label style="font-size:11px;color:rgba(255,255,255,.5);display:block;margin-bottom:4px">Usuario</label>
-            <input id="nu-user" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:8px 10px;color:#fff;font-size:13px;box-sizing:border-box;font-family:Inter,sans-serif">
-          </div>
-          <div>
-            <label style="font-size:11px;color:rgba(255,255,255,.5);display:block;margin-bottom:4px">Contraseña</label>
-            <input id="nu-pass" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:8px 10px;color:#fff;font-size:13px;box-sizing:border-box;font-family:Inter,sans-serif">
-          </div>
+        <div>
+          <label style="font-size:11px;color:rgba(255,255,255,.5);display:block;margin-bottom:4px">Contraseña${isEdit?' (vacío = no cambiar)':''}</label>
+          <input id="uf-pass" type="password" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:8px 10px;color:#fff;font-size:13px;box-sizing:border-box;font-family:Inter,sans-serif">
         </div>
-        <div style="margin-bottom:12px">
+        <div>
           <label style="font-size:11px;color:rgba(255,255,255,.5);display:block;margin-bottom:4px">Tipo</label>
-          <select id="nu-tipo" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:8px 10px;color:#fff;font-size:13px;font-family:Inter,sans-serif">
-            <option value="usuario">Usuario</option>
-            <option value="generico">Genérico</option>
-            <option value="admin">Admin</option>
+          <select id="uf-tipo" style="width:100%;background:#1e3250;border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:8px 10px;color:#fff;font-size:13px;font-family:Inter,sans-serif">
+            <option value="usuario" ${u.tipo==='usuario'?'selected':''}>Usuario</option>
+            <option value="generico" ${u.tipo==='generico'?'selected':''}>Genérico</option>
+            <option value="admin" ${u.tipo==='admin'?'selected':''}>Admin</option>
           </select>
         </div>
-        <div style="margin-bottom:12px">
-          <label style="font-size:11px;color:rgba(255,255,255,.5);display:block;margin-bottom:6px">Instituciones</label>
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
-            ${instOpts.map(i=>`<label style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,.7);font-size:12px;cursor:pointer"><input type="checkbox" id="nu-inst-${i}" checked style="accent-color:#0e7c7b"> ${i.replace('_',' ')}</label>`).join('')}
-          </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:11px;color:rgba(255,255,255,.5);display:block;margin-bottom:6px">Instituciones</label>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">
+          ${INSTS.map((k,i)=>`<label style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,.7);font-size:12px;cursor:pointer"><input type="checkbox" id="uf-inst-${k}" ${u[k]!==false?'checked':''} style="accent-color:#0e7c7b"> ${INST_LABELS[i]}</label>`).join('')}
         </div>
-        <div style="margin-bottom:20px">
-          <label style="font-size:11px;color:rgba(255,255,255,.5);display:block;margin-bottom:6px">Pestañas</label>
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
-            ${tabOpts.map(t=>`<label style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,.7);font-size:12px;cursor:pointer"><input type="checkbox" id="nu-tab-${t}" checked style="accent-color:#0e7c7b"> ${t}</label>`).join('')}
-          </div>
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:11px;color:rgba(255,255,255,.5);display:block;margin-bottom:6px">Pestañas</label>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">
+          ${TABS.map(t=>`<label style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,.7);font-size:12px;cursor:pointer"><input type="checkbox" id="uf-tab-${t}" ${pestanas.includes(t)||u.pestanas==='todas'?'checked':''} style="accent-color:#0e7c7b"> ${t}</label>`).join('')}
         </div>
-        <div id="nu-error" style="display:none;color:#f87171;font-size:12px;margin-bottom:10px"></div>
-        <button onclick="saveNewUser()" style="width:100%;background:#0e7c7b;border:none;color:#fff;padding:10px;border-radius:5px;cursor:pointer;font-weight:600;font-size:13px;font-family:Inter,sans-serif">Guardar usuario</button>
+      </div>
+      <div id="uf-error" style="display:none;color:#f87171;font-size:12px;margin-bottom:10px"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="saveUser(${isEdit?u.id:'null'})" style="background:#0e7c7b;border:none;color:#fff;padding:8px 20px;border-radius:5px;cursor:pointer;font-weight:600;font-size:13px;font-family:Inter,sans-serif">${isEdit?'Guardar cambios':'Crear usuario'}</button>
+        <button onclick="document.getElementById('user-form-wrap').innerHTML=''" style="background:rgba(255,255,255,.1);border:none;color:#fff;padding:8px 16px;border-radius:5px;cursor:pointer;font-size:13px;font-family:Inter,sans-serif">Cancelar</button>
       </div>
     </div>`;
-  document.body.insertAdjacentHTML('beforeend', form);
 }
 
-async function saveNewUser(){
-  const instOpts = ['PARQUE','NIÑOS','ICR','CTC','CIBIC','GO_FUNES'];
-  const tabOpts = ['anterior','actual','comparativo','debitos','responsables'];
-  const user = document.getElementById('nu-user').value.trim();
-  const pass = document.getElementById('nu-pass').value.trim();
-  const tipo = document.getElementById('nu-tipo').value;
-  if(!user||!pass){ document.getElementById('nu-error').textContent='Completá usuario y contraseña'; document.getElementById('nu-error').style.display='block'; return; }
-  const insts = instOpts.map(i=>document.getElementById('nu-inst-'+i)?.checked?'TRUE':'FALSE');
-  const tabs = tabOpts.filter(t=>document.getElementById('nu-tab-'+t)?.checked).join(',') || 'todas';
+async function editUser(id){
+  const resp = await supaFetch(`usuarios?id=eq.${id}&select=*`);
+  const data = await resp.json();
+  if(data.length) showUserForm(data[0]);
+  document.getElementById('user-form-wrap').scrollIntoView({behavior:'smooth'});
+}
+
+async function saveUser(id){
+  const INSTS = ['parque','ninos','icr','ctc','cibic','go_funes'];
+  const TABS = ['anterior','actual','comparativo','debitos','responsables'];
+  const user = document.getElementById('uf-user').value.trim().toLowerCase();
+  const pass = document.getElementById('uf-pass').value.trim();
+  const tipo = document.getElementById('uf-tipo').value;
+  if(!user){ document.getElementById('uf-error').textContent='El usuario es obligatorio'; document.getElementById('uf-error').style.display='block'; return; }
+  if(!id && !pass){ document.getElementById('uf-error').textContent='La contraseña es obligatoria para nuevos usuarios'; document.getElementById('uf-error').style.display='block'; return; }
+
+  const body = {
+    usuario: user, tipo,
+    ...Object.fromEntries(INSTS.map(k=>[k, document.getElementById('uf-inst-'+k)?.checked||false])),
+    pestanas: TABS.filter(t=>document.getElementById('uf-tab-'+t)?.checked).join(',') || 'todas',
+    activo: true
+  };
+  if(pass) body.password = pass;
+
   try{
-    const resp = await fetch(AUTH_URL, {
-      method:'POST',
-      body: JSON.stringify({action:'addUser', admin:currentUser.usuario, adminPass:currentUser.password||'', newUser:{usuario:user,password:pass,tipo,insts,tabs}}),
-      headers:{'Content-Type':'application/json'}
-    });
-    const data = await resp.json();
-    if(data.ok){ document.getElementById('add-user-modal').remove(); loadAdminUsers(); }
-    else { document.getElementById('nu-error').textContent=data.error||'Error al guardar'; document.getElementById('nu-error').style.display='block'; }
-  } catch(e){ document.getElementById('nu-error').textContent='Error de conexión'; document.getElementById('nu-error').style.display='block'; }
+    let resp;
+    if(id === null || id === 'null'){
+      resp = await supaFetch('usuarios', {method:'POST', body:JSON.stringify(body), headers:{'Prefer':'return=representation'}});
+    } else {
+      resp = await supaFetch(`usuarios?id=eq.${id}`, {method:'PATCH', body:JSON.stringify(body)});
+    }
+    if(resp.ok){
+      document.getElementById('user-form-wrap').innerHTML='';
+      loadAdminUsers();
+    } else {
+      const err = await resp.json();
+      document.getElementById('uf-error').textContent = err.message||'Error al guardar';
+      document.getElementById('uf-error').style.display='block';
+    }
+  } catch(e){
+    document.getElementById('uf-error').textContent='Error de conexión';
+    document.getElementById('uf-error').style.display='block';
+  }
 }
 
-function editUser(row){ alert('Editá directamente en la hoja de usuarios en Google Sheets y recargá el panel.'); }
+async function loadAdminConfig(){
+  const content = document.getElementById('admin-content');
+  content.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:20px;text-align:center">Cargando configuración...</div>';
+  try{
+    const resp = await supaFetch('configuracion?select=*&order=clave');
+    const rows = await resp.json();
+    const cfg = Object.fromEntries(rows.map(r=>[r.clave, {id:r.id, valor:r.valor, desc:r.descripcion}]));
+    content.innerHTML = `
+      <div style="color:#e0eaf4;font-weight:600;font-size:14px;margin-bottom:16px">Configuración del Dashboard</div>
+      <div style="display:grid;gap:14px">
+        ${rows.map(r=>`
+        <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:16px">
+          <div style="color:rgba(255,255,255,.5);font-size:11px;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">${r.descripcion||r.clave}</div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <input id="cfg-${r.id}" value="${r.valor||''}" style="flex:1;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:8px 12px;color:#fff;font-size:13px;font-family:Inter,sans-serif;outline:none">
+            <button onclick="saveConfig(${r.id})" style="background:#0e7c7b;border:none;color:#fff;padding:8px 16px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600;font-family:Inter,sans-serif;white-space:nowrap">Guardar</button>
+          </div>
+        </div>`).join('')}
+      </div>`;
+  } catch(e){
+    content.innerHTML='<div style="color:#f87171;padding:20px">Error al cargar configuración</div>';
+  }
+}
+
+async function saveConfig(id){
+  const val = document.getElementById('cfg-'+id).value.trim();
+  const resp = await supaFetch(`configuracion?id=eq.${id}`, {method:'PATCH', body:JSON.stringify({valor:val})});
+  if(resp.ok){
+    // Flash success
+    const input = document.getElementById('cfg-'+id);
+    input.style.borderColor='#4ade80';
+    setTimeout(()=>input.style.borderColor='rgba(255,255,255,.15)',2000);
+  }
+}
 </script>
 </body>
 </html>
