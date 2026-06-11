@@ -375,7 +375,7 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
   <div class="kpi-card k-green">
     <div class="kpi-label">Cobrado + Débitos</div>
     <div class="kpi-value">$24.385,1 M</div>
-    <div class="kpi-sub">efectivo + pendiente de acreditación</div>
+    <div class="kpi-sub">cobrado + debitado del período</div>
   </div>
   <div class="kpi-pct">
     <div class="kpi-label">% del Presupuesto</div>
@@ -416,7 +416,9 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
       <th>Institución</th>
       <th class="r">Presupuestado</th>
       <th class="r">Cobrado + Débitos</th>
+      <th class="r">% Cob. c/Déb.</th>
       <th class="r">Cobrado ($)</th>
+      <th class="r">% Cob. s/Déb.</th>
       <th class="r">Débitos</th>
       <th class="r">% Deb.</th>
       <th class="r">Ppto No Cobrado</th>
@@ -898,8 +900,8 @@ function makeSortable(tbodyId){
     th.title='Click para ordenar';
     th.addEventListener('click',()=>{
       if(sortCol===i){ sortAsc=!sortAsc; } else { sortCol=i; sortAsc=false; }
-      ths.forEach(t=>{ t.textContent=t.textContent.replace(' ^','').replace(' v',''); });
-      th.textContent += sortAsc?' ^':' v';
+      ths.forEach(t=>{ t.textContent=t.textContent.replace(' &uarr;','').replace(' &darr;',''); });
+      th.textContent += sortAsc?' &uarr;':' &darr;';
       const rows = Array.from(tbody.querySelectorAll('tr'));
       rows.sort((a,b)=>{
         const av = a.cells[i]?.textContent.trim()||'';
@@ -973,6 +975,8 @@ const allowedInsts=getInsts();
 INST.filter(d=>allowedInsts.includes(d.name)).forEach(d=>{
   const nc=d.presup-(d.cobrado+d.debitado);
   const pd=pctOf(d.debitado,d.cobrado);
+  const pctConDeb = d.presup>0 ? (d.deb_cob/d.presup*100) : 0;
+  const pctSinDeb = d.presup>0 ? (d.cobrado/d.presup*100) : 0;
   const ncClass=nc<0?'cell-brown':'cell-green';
   const tr=document.createElement('tr');
   tr.style.cursor='pointer';tr.title='Click para ver detalle';
@@ -981,7 +985,9 @@ INST.filter(d=>allowedInsts.includes(d.name)).forEach(d=>{
     <td><span class="ib">${d.name}</span></td>
     <td class="r">${fmt(d.presup)}</td>
     <td class="r cell-green">${fmt(d.deb_cob)}</td>
+    <td class="r"><span style="font-weight:700;color:${pctConDeb>=100?'#166534':'#991b1b'};background:${pctConDeb>=100?'#dcfce7':'#fee2e2'};padding:2px 7px;border-radius:3px;font-size:11px">${pctConDeb.toFixed(1)}%</span></td>
     <td class="r">${fmt(d.cobrado)}</td>
+    <td class="r"><span style="font-weight:700;color:${pctSinDeb>=100?'#166534':'#991b1b'};background:${pctSinDeb>=100?'#dcfce7':'#fee2e2'};padding:2px 7px;border-radius:3px;font-size:11px">${pctSinDeb.toFixed(1)}%</span></td>
     <td class="r cell-navy-light">${fmt(d.debitado)}</td>
     <td class="r">${pctBadge(pd)}</td>
     <td class="r ${ncClass}">${fmt(nc)}</td>`;
@@ -1633,9 +1639,9 @@ function buildComparativo(){
 // == DEBITOS PAGE ==
 const fmtFull2=n=>Math.abs(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const DEB_COLORS = ['#0d1b2e','#1a6b5a','#2563a8','#b45309','#7c3aed','#0891b2'];
-const SEMAFORO = (pct) => pct >= 10 ? '#dc2626' : pct >= 5 ? '#d97706' : '#16a34a';
-const SEMAFORO_BG = (pct) => pct >= 10 ? '#fee2e2' : pct >= 5 ? '#fef3c7' : '#dcfce7';
-const SEMAFORO_LABEL = (pct) => pct >= 10 ? 'Alto' : pct >= 5 ? 'Medio' : 'Bajo';
+const SEMAFORO = (pct) => pct >= 4 ? '#dc2626' : pct >= 2 ? '#d97706' : '#16a34a';
+const SEMAFORO_BG = (pct) => pct >= 4 ? '#fee2e2' : pct >= 2 ? '#fef3c7' : '#dcfce7';
+const SEMAFORO_LABEL = (pct) => pct >= 4 ? '<span style="color:#dc2626">&#11044;</span>' : pct >= 2 ? '<span style="color:#d97706">&#11044;</span>' : '<span style="color:#16a34a">&#11044;</span>';
 
 function buildDebitos(){
   // Populate selector immediately (no canvas needed)
@@ -1804,7 +1810,7 @@ function buildDebitosCharts(){
       return hmSortAsc ? av-bv : bv-av;
     });
 
-    const arrow = (col) => hmSortCol===col ? (hmSortAsc?' ^':' v') : ' ^v';
+    const arrow = (col) => hmSortCol===col ? (hmSortAsc?' &uarr;':' &darr;') : ' &#8693;';
 
     hmWrap.innerHTML = `
       <div style="max-height:520px;overflow-y:auto;overflow-x:auto">
