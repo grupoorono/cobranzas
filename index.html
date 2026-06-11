@@ -1560,15 +1560,20 @@ function buildComparativo(){
     let prevN=null;
     months.forEach(mes=>{
       const d = MONTHLY_DATA[mes][inst];
-      if(!d){rows+=`<tr><td><strong>${mes}</strong></td><td class="r" colspan="4" style="color:#9ca3af">Sin datos</td></tr>`;prevN=null;return;}
+      if(!d){rows+=`<tr><td><strong>${mes}</strong></td><td class="r" colspan="6" style="color:#9ca3af">Sin datos</td></tr>`;prevN=null;return;}
       const delta = prevN!=null?d.neto-prevN:null;
       const ds = delta!=null?`<span class="${delta>=0?'delta-up':'delta-down'}">${delta>=0?'↑':'↓'}${fmtM(Math.abs(delta))}</span>`:'—';
-      const pctC=d.neto&&d.presup?(d.neto/d.presup*100).toFixed(1)+'%':'—';
+      const pctConDeb = d.neto&&d.presup?(d.neto/d.presup*100).toFixed(1)+'%':'—';
+      const pctSinDeb = d.cobrado&&d.presup?(d.cobrado/d.presup*100).toFixed(1)+'%':'—';
+      const colorConDeb = d.presup&&d.neto?(d.neto/d.presup>=1?'#166534':'#991b1b'):'#374151';
+      const colorSinDeb = d.presup&&d.cobrado?(d.cobrado/d.presup>=1?'#166534':'#991b1b'):'#374151';
       rows+=`<tr>
         <td><strong>${mes}</strong></td>
         <td class="r">${fmtM(d.presup)}</td>
         <td class="r" style="color:#1a6b5a;font-weight:600">${fmtM(d.neto)}</td>
-        <td class="r" style="font-weight:600">${pctC}</td>
+        <td class="r" style="font-weight:700;color:${colorConDeb}">${pctConDeb}</td>
+        <td class="r">${fmtM(d.cobrado)}</td>
+        <td class="r" style="font-weight:700;color:${colorSinDeb}">${pctSinDeb}</td>
         <td class="r">${ds}</td>
       </tr>`;
       prevN=d.neto;
@@ -1576,7 +1581,7 @@ function buildComparativo(){
     card.innerHTML=`
       <div class="chart-card-head" style="background:${COLORS[ci]}"><h3>${inst}</h3><span>cobrado + débitos</span></div>
       <div class="comp-table-wrap"><table class="comp-table">
-        <thead><tr><th>Mes</th><th class="r">Presupuestado</th><th class="r">Cobrado+Deb</th><th class="r">% Ppto</th><th class="r">Var.</th></tr></thead>
+        <thead><tr><th>Mes</th><th class="r">Presupuestado</th><th class="r">Cobrado+Deb</th><th class="r">% c/Déb</th><th class="r">Cobrado</th><th class="r">% s/Déb</th><th class="r">Var.</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>`;
     wrap.appendChild(card);
@@ -1760,13 +1765,13 @@ function buildDebitosCharts(){
 
     const rankingWrap = document.getElementById('deb-ranking');
     rankingWrap.innerHTML = fins.map(d=>`
-      <div data-fin="${d.f.replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--gray-200);cursor:pointer;transition:background .1s" 
+      <div data-fin="${d.f.replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--gray-200);cursor:pointer;transition:background .1s;white-space:nowrap;min-width:0" 
            onmouseover="this.style.background='#f0f4f8'" onmouseout="this.style.background=''"
            onclick="showDebDetail('${d.f.replace(/'/g,"\\'")}')">
-        <span style="width:16px;font-size:13px">${SEMAFORO_LABEL(d.pct).split(' ')[0]}</span>
-        <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.f}">${d.f}</span>
-        <span style="font-size:11px;color:var(--gray-500);width:70px;text-align:right">${fmt(d.deb)}</span>
-        <span style="font-size:11px;font-weight:700;color:${SEMAFORO(d.pct)};background:${SEMAFORO_BG(d.pct)};padding:2px 7px;border-radius:3px;width:58px;text-align:center">${d.pct.toFixed(1)}%</span>
+        <span style="width:16px;font-size:13px;flex-shrink:0">${SEMAFORO_LABEL(d.pct)}</span>
+        <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0" title="${d.f}">${d.f}</span>
+        <span style="font-size:11px;color:var(--gray-500);width:70px;text-align:right;flex-shrink:0">${fmt(d.deb)}</span>
+        <span style="font-size:11px;font-weight:700;color:${SEMAFORO(d.pct)};background:${SEMAFORO_BG(d.pct)};padding:2px 7px;border-radius:3px;width:58px;text-align:center;flex-shrink:0">${d.pct.toFixed(1)}%</span>
       </div>`).join('');
 
     // Make ranking rows clickable — show comprobantes detail
