@@ -369,28 +369,28 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
 <div class="kpi-row">
   <div class="kpi-card">
     <div class="kpi-label">Presupuestado</div>
-    <div class="kpi-value">$23.127,3 M</div>
+    <div class="kpi-value" id="kpi-presup">$23.127,3 M</div>
     <div class="kpi-sub">Total período Mayo 2026</div>
   </div>
   <div class="kpi-card k-green">
     <div class="kpi-label">Cobrado + Débitos</div>
-    <div class="kpi-value">$24.385,1 M</div>
+    <div class="kpi-value" id="kpi-neto">$24.385,1 M</div>
     <div class="kpi-sub">cobrado + debitado del período</div>
   </div>
   <div class="kpi-pct">
     <div class="kpi-label">% del Presupuesto</div>
-    <div class="kpi-pct-value">105,44%</div>
+    <div class="kpi-pct-value" id="kpi-pct">105,44%</div>
     <div class="kpi-sub">cobrado + débitos</div>
   </div>
   <div class="kpi-card k-blue">
     <div class="kpi-label">Cobrado</div>
-    <div class="kpi-value" style="font-size:22px">$23.398,4 M</div>
-    <span class="kpi-badge kb-blue">101,17% del ppto (sin débitos)</span>
+    <div class="kpi-value" id="kpi-cobrado" style="font-size:22px">$23.398,4 M</div>
+    <span class="kpi-badge kb-blue" id="kpi-cobrado-badge">101,17% del ppto (sin débitos)</span>
   </div>
   <div class="kpi-card k-amber">
     <div class="kpi-label">Importe Debitado Total</div>
-    <div class="kpi-value">$986,7 M</div>
-    <span class="kpi-badge kb-amber">4,05% sobre cobrado</span>
+    <div class="kpi-value" id="kpi-deb">$986,7 M</div>
+    <span class="kpi-badge kb-amber" id="kpi-deb-badge">4,05% sobre cobrado</span>
   </div>
 </div>
 
@@ -996,8 +996,32 @@ INST.filter(d=>allowedInsts.includes(d.name)).forEach(d=>{
 
 makeSortable('inst-tbody');
 
+// ── KPIs Globales de Mes Anterior: recalculan según institución del usuario ──
+function renderMesAnteriorKPIs(){
+  const insts = getInsts();
+  const rows = INST.filter(d=>insts.includes(d.name));
+  const presup   = rows.reduce((s,d)=>s+d.presup,0);
+  const neto     = rows.reduce((s,d)=>s+d.deb_cob,0);
+  const cobrado  = rows.reduce((s,d)=>s+d.cobrado,0);
+  const debitado = rows.reduce((s,d)=>s+d.debitado,0);
+  const pctNeto = presup ? neto/presup*100 : 0;
+  const pctCob  = presup ? cobrado/presup*100 : 0;
+  const pctDeb  = neto ? debitado/neto*100 : 0;
+  const fmtM1 = n=>{const v=(Math.abs(n)/1e6).toFixed(1);const[i,dec]=v.split('.');return i.replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+dec+' M';};
+  const pc = x=>x.toFixed(2).replace('.',',');
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set('kpi-presup','$'+fmtM1(presup));
+  set('kpi-neto','$'+fmtM1(neto));
+  set('kpi-pct',pc(pctNeto)+'%');
+  set('kpi-cobrado','$'+fmtM1(cobrado));
+  set('kpi-cobrado-badge',pc(pctCob)+'% del ppto (sin débitos)');
+  set('kpi-deb','$'+fmtM1(debitado));
+  set('kpi-deb-badge',pc(pctDeb)+'% sobre cobrado');
+}
+renderMesAnteriorKPIs();
+
 // Debit bars
-const maxD=Math.max(...INST.map(d=>d.debitado));
+const maxD=Math.max(...INST.filter(d=>getInsts().includes(d.name)).map(d=>d.debitado));
 const dbWrap=document.getElementById('debit-bars');
 INST.filter(d=>getInsts().includes(d.name)).forEach((d,i)=>{
   const w=(d.debitado/maxD*100).toFixed(1);
@@ -1048,7 +1072,7 @@ RESP.forEach((r,i)=>{
 });
 
 // NC bars
-const ncData=INST.map(d=>({name:d.name,val:d.presup-(d.cobrado+d.debitado)}));
+const ncData=INST.filter(d=>getInsts().includes(d.name)).map(d=>({name:d.name,val:d.presup-(d.cobrado+d.debitado)}));
 const maxNC=Math.max(...ncData.map(d=>Math.abs(d.val)));
 const ncWrap=document.getElementById('nc-bars');
 ncData.forEach(d=>{
@@ -1442,11 +1466,27 @@ const fmtPct=n=>n!=null?n.toFixed(2)+'%':'—';
 function buildComparativo(){
   const months = MESES.filter(m=>MONTHLY_DATA[m]);
 
+  // Total del mes según institución del usuario (si ve las 6, usa el TOTAL precalculado)
+  function monthTotal(mes){
+    const insts = getInsts();
+    if(insts.length === ALL_INSTS.length) return MONTHLY_DATA[mes].TOTAL;
+    let presup=0,cobrado=0,debitado=0,neto=0,nc=0;
+    insts.forEach(inst=>{
+      const d = MONTHLY_DATA[mes][inst];
+      if(!d) return;
+      presup+=d.presup; cobrado+=d.cobrado; debitado+=d.debitado; neto+=d.neto; nc+=d.nc;
+    });
+    return {presup,cobrado,debitado,neto,nc,
+      pct_neto: presup? neto/presup*100 : 0,
+      pct_cobrado: presup? cobrado/presup*100 : 0,
+      pct_deb: neto? debitado/neto*100 : 0};
+  }
+
   // ── SUMMARY TABLE ──
   const tbody = document.getElementById('comp-tbody');
   let prevNeto = null;
   months.forEach((mes,i)=>{
-    const t = MONTHLY_DATA[mes].TOTAL;
+    const t = monthTotal(mes);
     const nc = t.nc;
     const delta = prevNeto!=null ? t.neto - prevNeto : null;
     const deltaStr = delta!=null
@@ -1457,7 +1497,7 @@ function buildComparativo(){
     const tr = document.createElement('tr');
     if(mes==='Mayo') tr.style.fontWeight='600';
     tr.innerHTML=`
-      <td><strong>${mes}</strong>${t.presup<15e9?'<span style="font-size:10px;color:#b45309;margin-left:6px">⚠ parcial</span>':''}</td>
+      <td><strong>${mes}</strong>${(getInsts().length===ALL_INSTS.length && t.presup<15e9)?'<span style="font-size:10px;color:#b45309;margin-left:6px">⚠ parcial</span>':''}</td>
       <td class="r">${fmtM(t.presup)}</td>
       <td class="r" style="color:#1a6b5a;font-weight:600">${fmtM(t.neto)}</td>
       <td class="r"><span style="color:${pctColor};font-weight:700">${fmtPct(t.pct_neto)}</span></td>
@@ -1481,8 +1521,8 @@ function buildComparativo(){
     data:{
       labels:months,
       datasets:[
-        {label:'Presupuestado',data:months.map(m=>MONTHLY_DATA[m].TOTAL.presup/1e6),backgroundColor:'rgba(13,27,46,.15)',borderColor:'#0d1b2e',borderWidth:1.5},
-        {label:'Cobrado + Débitos',data:months.map(m=>MONTHLY_DATA[m].TOTAL.neto/1e6),backgroundColor:'rgba(26,107,90,.7)',borderColor:'#1a6b5a',borderWidth:1.5},
+        {label:'Presupuestado',data:months.map(m=>monthTotal(m).presup/1e6),backgroundColor:'rgba(13,27,46,.15)',borderColor:'#0d1b2e',borderWidth:1.5},
+        {label:'Cobrado + Débitos',data:months.map(m=>monthTotal(m).neto/1e6),backgroundColor:'rgba(26,107,90,.7)',borderColor:'#1a6b5a',borderWidth:1.5},
       ]
     },
     options:{...chartDefaults,responsive:true,plugins:{...chartDefaults.plugins},scales:{...chartDefaults.scales,y:{...chartDefaults.scales.y,ticks:{...chartDefaults.scales.y.ticks,callback:v=>v.toLocaleString('es-AR')}}}}
@@ -1495,7 +1535,7 @@ function buildComparativo(){
       labels:months,
       datasets:[{
         label:'% Cobrado+Deb / Presupuesto',
-        data:months.map(m=>MONTHLY_DATA[m].TOTAL.pct_neto),
+        data:months.map(m=>monthTotal(m).pct_neto),
         borderColor:'#1a6b5a',backgroundColor:'rgba(26,107,90,.1)',
         borderWidth:2.5,pointRadius:5,pointBackgroundColor:'#1a6b5a',tension:.3,fill:true
       },{
@@ -1514,7 +1554,7 @@ function buildComparativo(){
       labels:months,
       datasets:[{
         label:'Importe Debitado',
-        data:months.map(m=>MONTHLY_DATA[m].TOTAL.debitado/1e6),
+        data:months.map(m=>monthTotal(m).debitado/1e6),
         backgroundColor:'rgba(180,83,9,.7)',borderColor:'#b45309',borderWidth:1.5,borderRadius:3
       }]
     },
@@ -1528,7 +1568,7 @@ function buildComparativo(){
       labels:months,
       datasets:[{
         label:'% Débitos / Cobrado',
-        data:months.map(m=>MONTHLY_DATA[m].TOTAL.pct_deb),
+        data:months.map(m=>monthTotal(m).pct_deb),
         borderColor:'#b45309',backgroundColor:'rgba(180,83,9,.1)',
         borderWidth:2.5,pointRadius:5,pointBackgroundColor:'#b45309',tension:.3,fill:true
       }]
