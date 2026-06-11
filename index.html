@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cobranzas Mayo 2026 — Grupo Oroño</title>
+<!-- Session guard: redirect to login if not authenticated -->
+<script>
+(function(){
+  if(!sessionStorage.getItem('go_session')){
+    window.location.replace('login.html');
+  }
+})();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -169,6 +177,10 @@ td.r{text-align:right;font-variant-numeric:tabular-nums}
 
 footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;background:var(--gray-100)}
 
+/* LOGIN ENFORCEMENT */
+#login-screen{position:fixed;inset:0;z-index:9999;}
+#main-app{position:relative;}
+
 /* PAGE TABS */
 .page-tabs{background:#fff;border-bottom:2px solid var(--gray-200);padding:0 28px;display:flex;gap:0}
 .page-tab{padding:12px 22px;font-size:13px;font-weight:600;color:var(--gray-500);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;letter-spacing:.2px}
@@ -315,7 +327,7 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
 </head>
 <body>
 
-<!-- HEADER -->
+
 <header>
   <div class="logo-wrap">
     <div class="logo-circle">GO</div>
@@ -2119,6 +2131,254 @@ function closeChartFS(){
   if(c){ const ch = Chart.getChart(c); if(ch) ch.destroy(); }
   body.innerHTML = '';
 }
+</script>
+
+
+<script>
+const AUTH_URL = 'https://script.google.com/macros/s/AKfycbw9S5Hq7pqN3UH6pzBK_fQs_da60UzZ70WBp9jiO-zOONPkjVwtLr9VJxXoWxxl9nwR/exec';
+let currentUser = null;
+
+// Check session
+window.addEventListener('load', ()=>{
+  const saved = sessionStorage.getItem('go_session');
+  if(saved){
+    try{
+      currentUser = JSON.parse(saved);
+      applyPermissions(currentUser);
+      showApp();
+    } catch(e){
+      sessionStorage.removeItem('go_session');
+      window.location.replace('login.html');
+    }
+  } else {
+    window.location.replace('login.html');
+  }
+});
+
+async function doLogin(){
+  const btn = document.getElementById('login-btn');
+  const errDiv = document.getElementById('login-error');
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value.trim();
+
+  if(!user || !pass){ showLoginError('Completá usuario y contraseña'); return; }
+
+  btn.textContent = 'Verificando...';
+  btn.disabled = true;
+  errDiv.style.display = 'none';
+
+  try{
+    const resp = await fetch(AUTH_URL, {
+      method: 'POST',
+      body: JSON.stringify({usuario: user, password: pass}),
+      headers: {'Content-Type': 'application/json'}
+    });
+    const data = await resp.json();
+
+    if(data.ok){
+      currentUser = data;
+      sessionStorage.setItem('go_session', JSON.stringify(data));
+      applyPermissions(data);
+      showApp();
+    } else {
+      showLoginError(data.error || 'Usuario o contraseña incorrectos');
+    }
+  } catch(e){
+    showLoginError('Error de conexión. Verificá tu internet.');
+  }
+  btn.textContent = 'Ingresar';
+  btn.disabled = false;
+}
+
+function showLoginError(msg){
+  const errDiv = document.getElementById('login-error');
+  errDiv.textContent = msg;
+  errDiv.style.display = 'block';
+}
+
+function showApp(){
+  // Show user info in header
+  const headerRight = document.querySelector('.header-right');
+  if(headerRight && currentUser){
+    const userInfo = document.createElement('div');
+    userInfo.style.cssText = 'display:flex;align-items:center;gap:10px';
+    userInfo.innerHTML = `
+      <span style="color:rgba(255,255,255,.6);font-size:12px">👤 ${currentUser.usuario}</span>
+      ${currentUser.tipo==='admin'?'<button onclick="showAdminPanel()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:Inter,sans-serif">⚙️ Admin</button>':''}
+      <button onclick="logout()" style="background:rgba(201,64,64,.2);border:1px solid rgba(201,64,64,.3);color:#f87171;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:Inter,sans-serif">Salir</button>`;
+    headerRight.prepend(userInfo);
+  }
+}
+
+function logout(){
+  sessionStorage.removeItem('go_session');
+  window.location.replace('login.html');
+}
+
+function applyPermissions(user){
+  if(user.tipo === 'admin' || user.tipo === 'generico') return; // see everything
+
+  // Hide tabs based on pestañas permission
+  const tabMap = {
+    'mayo': "switchPage('mensual')",
+    'junio': "switchPage('junio')",
+    'comparativo': "switchPage('comparativo')",
+    'debitos': "switchPage('debitos')",
+    'responsables': "switchPage('responsables')"
+  };
+  const allowed = user.pestañas === 'todas' ? Object.keys(tabMap) : user.pestañas.split(',').map(t=>t.trim());
+
+  document.querySelectorAll('.page-tab').forEach(tab=>{
+    const onclick = tab.getAttribute('onclick')||'';
+    const key = Object.keys(tabMap).find(k=>tabMap[k]===onclick);
+    if(key && !allowed.includes(key)) tab.style.display='none';
+  });
+  document.querySelectorAll('.mbn-tab').forEach(tab=>{
+    const onclick = tab.getAttribute('onclick')||'';
+    const key = Object.keys(tabMap).find(k=>onclick.includes("'"+k+"'") || onclick.includes("'mensual'") && k==='mayo');
+    if(key && !allowed.includes(key)) tab.style.display='none';
+  });
+
+  // Filter institutions in tables - hide rows of institutions user can't see
+  const instPermissions = user.instituciones || {};
+  const allowedInsts = Object.entries(instPermissions).filter(([,v])=>v).map(([k])=>k.replace('_',' '));
+
+  // Apply inst filter when data loads
+  window._instFilter = allowedInsts;
+}
+
+// ── ADMIN PANEL ──
+function showAdminPanel(){
+  let modal = document.getElementById('admin-modal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'admin-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:flex;align-items:center;justify-content:center';
+    modal.innerHTML = `
+      <div style="background:#192840;border-radius:12px;width:min(96vw,900px);max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+        <div style="background:var(--navy);padding:16px 22px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+          <span style="color:#fff;font-size:15px;font-weight:600">⚙️ Panel de Administración</span>
+          <button onclick="document.getElementById('admin-modal').remove()" style="background:rgba(255,255,255,.1);border:none;color:#fff;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:14px">✕</button>
+        </div>
+        <div style="overflow-y:auto;flex:1;padding:22px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <span style="color:#e0eaf4;font-weight:600;font-size:14px">Usuarios registrados</span>
+            <button onclick="showAddUser()" style="background:#0e7c7b;border:none;color:#fff;padding:7px 16px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600">+ Nuevo usuario</button>
+          </div>
+          <div id="admin-users-list" style="color:rgba(255,255,255,.6);text-align:center;padding:20px">Cargando...</div>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
+  }
+  loadAdminUsers();
+}
+
+async function loadAdminUsers(){
+  const list = document.getElementById('admin-users-list');
+  if(!list) return;
+  list.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:20px;text-align:center">Cargando usuarios...</div>';
+  try{
+    const resp = await fetch(AUTH_URL+'?action=list&admin='+encodeURIComponent(currentUser.usuario));
+    const data = await resp.json();
+    if(!data.users){ list.innerHTML='<div style="color:#f87171;padding:20px">Error al cargar usuarios</div>'; return; }
+    list.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--navy)">
+          <th style="padding:8px 12px;color:rgba(255,255,255,.7);text-align:left;font-size:10px;text-transform:uppercase">Usuario</th>
+          <th style="padding:8px 12px;color:rgba(255,255,255,.7);text-align:left;font-size:10px;text-transform:uppercase">Tipo</th>
+          <th style="padding:8px 12px;color:rgba(255,255,255,.7);text-align:left;font-size:10px;text-transform:uppercase">Instituciones</th>
+          <th style="padding:8px 12px;color:rgba(255,255,255,.7);text-align:left;font-size:10px;text-transform:uppercase">Pestañas</th>
+          <th style="padding:8px 12px;color:rgba(255,255,255,.7);text-align:center;font-size:10px;text-transform:uppercase">Activo</th>
+          <th style="padding:8px 12px;color:rgba(255,255,255,.7);text-align:center;font-size:10px;text-transform:uppercase">Acciones</th>
+        </tr></thead>
+        <tbody>${data.users.map((u,i)=>`
+          <tr style="border-bottom:1px solid rgba(255,255,255,.07)">
+            <td style="padding:8px 12px;color:#e0eaf4;font-weight:500">${u[0]}</td>
+            <td style="padding:8px 12px"><span style="background:${u[2]==='admin'?'rgba(14,124,123,.3)':u[2]==='generico'?'rgba(37,99,168,.3)':'rgba(255,255,255,.1)'};color:${u[2]==='admin'?'#14a8a7':u[2]==='generico'?'#60a5fa':'#9ca3af'};padding:2px 8px;border-radius:3px;font-size:11px">${u[2]}</span></td>
+            <td style="padding:8px 12px;color:rgba(255,255,255,.6);font-size:11px">${[u[3],u[4],u[5],u[6],u[7],u[8]].map((v,j)=>v==='TRUE'||v===true?['PARQUE','NIÑOS','ICR','CTC','CIBIC','GO FUNES'][j]:'').filter(Boolean).join(', ')||'Ninguna'}</td>
+            <td style="padding:8px 12px;color:rgba(255,255,255,.6);font-size:11px">${u[9]||'todas'}</td>
+            <td style="padding:8px 12px;text-align:center">${(u[10]==='TRUE'||u[10]===true||u[10]===undefined)?'<span style="color:#4ade80">●</span>':'<span style="color:#f87171">●</span>'}</td>
+            <td style="padding:8px 12px;text-align:center">
+              <button onclick="editUser(${i+1})" style="background:rgba(255,255,255,.1);border:none;color:#fff;padding:3px 8px;border-radius:3px;cursor:pointer;font-size:11px;margin-right:4px">✏️</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch(e){
+    list.innerHTML='<div style="color:#f87171;padding:20px">Error de conexión</div>';
+  }
+}
+
+function showAddUser(){
+  const instOpts = ['PARQUE','NIÑOS','ICR','CTC','CIBIC','GO_FUNES'];
+  const tabOpts = ['mayo','junio','comparativo','debitos','responsables'];
+  const form = `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;display:flex;align-items:center;justify-content:center" id="add-user-modal">
+      <div style="background:#192840;border-radius:10px;width:min(94vw,480px);padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+          <span style="color:#fff;font-weight:600;font-size:15px">Nuevo Usuario</span>
+          <button onclick="document.getElementById('add-user-modal').remove()" style="background:none;border:none;color:rgba(255,255,255,.5);font-size:18px;cursor:pointer">✕</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div>
+            <label style="font-size:11px;color:rgba(255,255,255,.5);display:block;margin-bottom:4px">Usuario</label>
+            <input id="nu-user" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:8px 10px;color:#fff;font-size:13px;box-sizing:border-box;font-family:Inter,sans-serif">
+          </div>
+          <div>
+            <label style="font-size:11px;color:rgba(255,255,255,.5);display:block;margin-bottom:4px">Contraseña</label>
+            <input id="nu-pass" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:8px 10px;color:#fff;font-size:13px;box-sizing:border-box;font-family:Inter,sans-serif">
+          </div>
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:11px;color:rgba(255,255,255,.5);display:block;margin-bottom:4px">Tipo</label>
+          <select id="nu-tipo" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:8px 10px;color:#fff;font-size:13px;font-family:Inter,sans-serif">
+            <option value="usuario">Usuario</option>
+            <option value="generico">Genérico</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:11px;color:rgba(255,255,255,.5);display:block;margin-bottom:6px">Instituciones</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            ${instOpts.map(i=>`<label style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,.7);font-size:12px;cursor:pointer"><input type="checkbox" id="nu-inst-${i}" checked style="accent-color:#0e7c7b"> ${i.replace('_',' ')}</label>`).join('')}
+          </div>
+        </div>
+        <div style="margin-bottom:20px">
+          <label style="font-size:11px;color:rgba(255,255,255,.5);display:block;margin-bottom:6px">Pestañas</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            ${tabOpts.map(t=>`<label style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,.7);font-size:12px;cursor:pointer"><input type="checkbox" id="nu-tab-${t}" checked style="accent-color:#0e7c7b"> ${t}</label>`).join('')}
+          </div>
+        </div>
+        <div id="nu-error" style="display:none;color:#f87171;font-size:12px;margin-bottom:10px"></div>
+        <button onclick="saveNewUser()" style="width:100%;background:#0e7c7b;border:none;color:#fff;padding:10px;border-radius:5px;cursor:pointer;font-weight:600;font-size:13px;font-family:Inter,sans-serif">Guardar usuario</button>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', form);
+}
+
+async function saveNewUser(){
+  const instOpts = ['PARQUE','NIÑOS','ICR','CTC','CIBIC','GO_FUNES'];
+  const tabOpts = ['mayo','junio','comparativo','debitos','responsables'];
+  const user = document.getElementById('nu-user').value.trim();
+  const pass = document.getElementById('nu-pass').value.trim();
+  const tipo = document.getElementById('nu-tipo').value;
+  if(!user||!pass){ document.getElementById('nu-error').textContent='Completá usuario y contraseña'; document.getElementById('nu-error').style.display='block'; return; }
+  const insts = instOpts.map(i=>document.getElementById('nu-inst-'+i)?.checked?'TRUE':'FALSE');
+  const tabs = tabOpts.filter(t=>document.getElementById('nu-tab-'+t)?.checked).join(',') || 'todas';
+  try{
+    const resp = await fetch(AUTH_URL, {
+      method:'POST',
+      body: JSON.stringify({action:'addUser', admin:currentUser.usuario, adminPass:currentUser.password||'', newUser:{usuario:user,password:pass,tipo,insts,tabs}}),
+      headers:{'Content-Type':'application/json'}
+    });
+    const data = await resp.json();
+    if(data.ok){ document.getElementById('add-user-modal').remove(); loadAdminUsers(); }
+    else { document.getElementById('nu-error').textContent=data.error||'Error al guardar'; document.getElementById('nu-error').style.display='block'; }
+  } catch(e){ document.getElementById('nu-error').textContent='Error de conexión'; document.getElementById('nu-error').style.display='block'; }
+}
+
+function editUser(row){ alert('Editá directamente en la hoja de usuarios en Google Sheets y recargá el panel.'); }
 </script>
 </body>
 </html>
