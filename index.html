@@ -134,9 +134,11 @@ td.r{text-align:right;font-variant-numeric:tabular-nums}
 .rr-val{width:100px;text-align:right;font-size:12px;font-variant-numeric:tabular-nums;font-weight:600}
 
 /* INST BUTTONS */
-.inst-btn-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-.inst-btn{background:var(--white);border:1.5px solid var(--gray-300);color:var(--navy);padding:5px 14px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;letter-spacing:.3px}
+.inst-btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.inst-btn{background:var(--white);border:2px solid var(--gray-300);color:var(--navy);padding:9px 20px;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.3px}
 .inst-btn:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
+.inst-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);box-shadow:0 3px 10px rgba(13,27,46,.35)}
+.filter-label{font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin:4px 0 8px;display:flex;align-items:center;gap:6px}
 
 /* MODAL */
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:center;justify-content:center}
@@ -280,8 +282,8 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
   .tc{overflow:hidden}
 
   /* inst buttons */
-  .inst-btn-row{gap:5px}
-  .inst-btn{padding:5px 10px;font-size:11px}
+  .inst-btn-row{gap:6px}
+  .inst-btn{padding:8px 14px;font-size:13px}
 
   /* tables on mobile: scroll horizontally */
   .tc table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -408,8 +410,9 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
 </div>
 
 <!-- DETALLE INSTITUCIONES -->
-<div class="sec-title">Presupuesto / Cobranzas — Click en institución para ver detalle</div>
+<div class="filter-label">🔎 Filtrar toda la hoja por institución</div>
 <div class="inst-btn-row" id="inst-btns"></div>
+<div class="sec-title">Presupuesto / Cobranzas — Click en una fila para ver facturas y débitos</div>
 <div class="tc">
   <table>
     <thead><tr>
@@ -483,7 +486,7 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
   <div id="junio-content" style="display:none">
     <div class="kpi-row" id="junio-kpis"></div>
 
-    <div class="sec-title" style="margin-top:20px">Detalle por Institución — Click para ver facturas y débitos</div>
+    <div class="filter-label" style="margin-top:20px">🔎 Filtrar toda la hoja por institución</div>
     <div class="inst-btn-row" id="junio-inst-btns"></div>
     <div class="two-col">
       <div class="tc">
@@ -981,7 +984,7 @@ btnWrap.innerHTML='';
     b.className='inst-btn';
     b.textContent=label;
     const isActive = (val==='' && !window._activeInst) || (val && window._activeInst===val);
-    if(isActive){ b.style.background='var(--navy)'; b.style.color='#fff'; b.style.borderColor='var(--navy)'; }
+    if(isActive) b.classList.add('active');
     b.onclick=()=>setActiveInst(val);
     return b;
   };
@@ -1048,21 +1051,31 @@ INST.filter(d=>getInsts().includes(d.name)).forEach((d,i)=>{
   dbWrap.innerHTML+=`<div class="br-row"><div class="br-name">${d.name}</div><div class="br-track"><div class="br-fill bf-navy" style="width:0" data-w="${w}"></div></div><div class="br-val">${fmt(d.debitado)}</div></div>`;
 });
 
-// Financ table
-// Filter financiadores by allowed institutions
+// Financ table — si hay filtro por institución, recalcular los IMPORTES por financiador
+// desde el detalle (facturas+débitos) de esa institución; si no, usar los totales del grupo.
 const allowedInstsFin = getInsts();
-const finsByInst = {};
-allowedInstsFin.forEach(inst=>{
-  const d = RAW_DATA['Mayo']?.[inst] || RAW_DATA[inst];
-  if(!d) return;
-  [...(d.facturas||[]),...(d.debitos||[])].forEach(r=>{
-    if(r.financiador) finsByInst[r.financiador] = true;
+let finList;
+if(allowedInstsFin.length === 6){
+  finList = FINANC.map(d=>({name:d.name,presup:d.presup,cobrado:d.cobrado,debitado:d.debitado,deb_cob:d.deb_cob}));
+} else {
+  const agg = {};
+  allowedInstsFin.forEach(inst=>{
+    const dd = RAW_DATA['Mayo']?.[inst] || RAW_DATA[inst];
+    if(!dd) return;
+    [...(dd.facturas||[]),...(dd.debitos||[])].forEach(r=>{
+      const f=r.financiador; if(!f) return;
+      if(!agg[f]) agg[f]={name:f,presup:0,cobrado:0,debitado:0};
+      agg[f].presup   += r.adeudado||0;
+      agg[f].cobrado  += Math.abs(r.cobrado||0);
+      agg[f].debitado += Math.abs(r.debitado||0);
+    });
   });
-});
-const filteredFINANC = allowedInstsFin.length === 6 ? FINANC : FINANC.filter(d=>finsByInst[d.name]);
+  finList = Object.values(agg).map(d=>({...d, deb_cob:d.cobrado+d.debitado}));
+  finList.sort((a,b)=>b.deb_cob-a.deb_cob);
+}
 
 const ftbody=document.getElementById('fin-tbody');
-filteredFINANC.forEach(d=>{
+finList.forEach(d=>{
   const pd=pctOf(d.debitado,d.cobrado);
   const nc=d.presup-(d.cobrado+d.debitado);
   const ncClass=nc<0?'cell-brown':'cell-green';
@@ -1158,8 +1171,12 @@ function renderTable(rows,reset){
   currentData=[...rows];
   const isDeb=currentTab==='debitos';
   const cols=isDeb
-    ?['Financiador','Comprobante','Fecha Fact.','Fecha Cobro','Adeudado','Cobrado','Debitado','Responsable','Estado']
-    :['Financiador','Comprobante','Fecha Fact.','Fecha Cobro','Adeudado','Cobrado','Responsable','Estado'];
+    ?['Financiador','Comprobante','Fecha Fact.','Fecha Cobro','Adeudado','Debitado','Estado']
+    :['Financiador','Comprobante','Fecha Fact.','Fecha Cobro','Adeudado','Estado'];
+  const keys=isDeb
+    ?['financiador','comprobante','fecha_fact','fecha_cobro','adeudado','debitado',null]
+    :['financiador','comprobante','fecha_fact','fecha_cobro','adeudado',null];
+  window._modalColKeys=keys;
   const rightCols=['Adeudado','Cobrado','Debitado'];
   document.getElementById('modal-thead').innerHTML=`<tr>${cols.map((c,i)=>`<th class="${rightCols.includes(c)?'r':''}" onclick="sortBy(${i})">${c} <span style="opacity:.35;font-size:9px">▲▼</span></th>`).join('')}</tr>`;
   const tbody=document.getElementById('modal-tbody');
@@ -1176,9 +1193,7 @@ function renderTable(rows,reset){
         <td style="white-space:nowrap;color:var(--gray-500)">${r.fecha_fact||'—'}</td>
         <td style="white-space:nowrap;color:var(--gray-500)">${r.fecha_cobro||'—'}</td>
         <td class="r">${r.adeudado?fmtN(r.adeudado):'—'}</td>
-        <td class="r mv-cobrado">${r.cobrado?fmtN(Math.abs(r.cobrado)):'—'}</td>
         <td class="r mv-debitado">${r.debitado?fmtN(Math.abs(r.debitado)):'—'}</td>
-        <td>${r.responsable||'—'}</td>
         <td>${est}</td>`;
     }else{
       tr.innerHTML=`
@@ -1187,21 +1202,19 @@ function renderTable(rows,reset){
         <td style="white-space:nowrap;color:var(--gray-500)">${r.fecha_fact||'—'}</td>
         <td style="white-space:nowrap;color:var(--gray-500)">${r.fecha_cobro||'—'}</td>
         <td class="r">${r.adeudado?fmtN(r.adeudado):'—'}</td>
-        <td class="r mv-cobrado">${r.cobrado?fmtN(Math.abs(r.cobrado)):'—'}</td>
-        <td>${r.responsable||'—'}</td>
         <td>${est}</td>`;
     }
     tbody.appendChild(tr);
   });
   document.getElementById('modal-count').textContent=`${currentData.length} registros`;
-  document.getElementById('modal-total').textContent=`Adeudado: $${fmt(totAd)} | Cobrado: $${fmt(totCob)}${isDeb?' | Debitado: $'+fmt(totDeb):''}`;
+  document.getElementById('modal-total').textContent=`Adeudado: $${fmt(totAd)}${isDeb?' | Debitado: $'+fmt(totDeb):''}`;
 }
 
-const colKeys=['financiador','comprobante','fecha_fact','fecha_cobro','adeudado','cobrado','debitado','responsable'];
 let sortCol=-1,sortAsc=true;
 function sortBy(i){
   sortCol===i?sortAsc=!sortAsc:(sortCol=i,sortAsc=true);
-  const k=colKeys[i];if(!k)return;
+  const keys=window._modalColKeys||[];
+  const k=keys[i];if(!k)return;
   currentData.sort((a,b)=>{let av=a[k]||'',bv=b[k]||'';return typeof av==='number'?(sortAsc?av-bv:bv-av):(sortAsc?String(av).localeCompare(String(bv)):String(bv).localeCompare(String(av)))});
   const tmp=currentData;
   renderTable(tmp,false);
@@ -1336,7 +1349,7 @@ async function loadJunio(){
         b.className='inst-btn';
         b.textContent=label;
         const isActive=(val===''&&!window._activeInst)||(val&&window._activeInst===val);
-        if(isActive){ b.style.background='var(--navy)'; b.style.color='#fff'; b.style.borderColor='var(--navy)'; }
+        if(isActive) b.classList.add('active');
         b.onclick=()=>setActiveInst(val);
         return b;
       };
@@ -2337,19 +2350,7 @@ function showApp(){
     const userInfo = document.createElement('div');
     userInfo.style.cssText = 'display:flex;align-items:center;gap:10px';
 
-    // Filtro BI por institución — solo para usuarios con más de una institución
-    const allowed = getAllowedInsts();
-    let filterHtml = '';
-    if(allowed.length > 1){
-      const opts = ['<option value="">Todas las instituciones</option>']
-        .concat(allowed.map(i=>`<option value="${i}" ${window._activeInst===i?'selected':''}>${i}</option>`))
-        .join('');
-      filterHtml = `<select onchange="setActiveInst(this.value)" title="Filtrar por institución"
-        style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 10px;border-radius:4px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif;max-width:200px">${opts}</select>`;
-    }
-
     userInfo.innerHTML = `
-      ${filterHtml}
       <span style="color:rgba(255,255,255,.6);font-size:12px">👤 ${currentUser.usuario}</span>
       ${currentUser.tipo==='admin'?'<button onclick="showAdminPanel()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:Inter,sans-serif">⚙️ Admin</button>':''}
       <button onclick="logout()" style="background:rgba(201,64,64,.2);border:1px solid rgba(201,64,64,.3);color:#f87171;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:Inter,sans-serif">Salir</button>`;
