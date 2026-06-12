@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cobranzas Mayo 2026 — Grupo Oroño</title>
+<title>Panel de Gestión de Cobranzas — Grupo Oroño</title>
 <!-- Session guard: redirect to login if not authenticated -->
 <script>
 (function(){
@@ -279,6 +279,8 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
 
   /* grids all single column */
   .two-col,.three-col{grid-template-columns:1fr;gap:10px}
+  /* grillas con columnas puestas inline también colapsan en mobile */
+  [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr !important}
   .tc{overflow:hidden}
 
   /* inst buttons */
@@ -335,7 +337,7 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
     <div class="logo-circle">GO</div>
     <div>
       <div class="logo-name">Grupo Oroño</div>
-      <div class="logo-sub">Proyección de Cobranzas</div>
+      <div class="logo-sub">Panel de Gestión de Cobranzas</div>
     </div>
   </div>
   <nav class="nav-tabs">
@@ -348,10 +350,6 @@ footer{text-align:center;padding:16px;color:var(--gray-500);font-size:11px;backg
     <div class="nav-tab">Cuentas x Agente</div>
   </nav>
   <div class="header-right">
-    <div class="header-period">
-      <div class="hp-label">Período</div>
-      <div class="hp-val">Mayo 2026</div>
-    </div>
   </div>
 </header>
 
