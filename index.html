@@ -2508,7 +2508,9 @@ function showApp(){
             const finData = typeof row.datos_facturado === 'string'
               ? JSON.parse(row.datos_facturado)
               : row.datos_facturado;
-            FACTURADO_DATA[mes] = finData;
+            // Normalizar nombre: "Enero 2026" -> "Enero", "Mayo 2026" -> "Mayo"
+            const mesNorm = mes.replace(/\s+\d{4}$/, '').trim();
+            FACTURADO_DATA[mesNorm] = finData;
           } catch(e){ console.warn('datos_facturado parse error', mes, e); }
         });
       }
