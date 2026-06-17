@@ -648,6 +648,9 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
     <button class="deb-reset" type="button" onclick="resetDebFilters()">Limpiar todo</button>
   </div>
 
+  <!-- CAMPO DE CONTROL: Total Facturado (= adeudado) -->
+  <div id="deb-control-total" style="margin:10px 0 4px"></div>
+
   <div class="kpi-row" id="deb-kpis"></div>
 
   <!-- 1. Evolución Mensual -->
@@ -1837,6 +1840,40 @@ function buildDebitosCharts(){
     }
     document.getElementById('deb-kpis').innerHTML=kpiHtml;
 
+    // ── CAMPO DE CONTROL: Total Facturado (= suma de adeudado) según filtros activos ──
+    {
+      const mesesC = mes ? [mes] : MESES_D;
+      const instsC = inst ? [inst] : getInsts();
+      let totAd=0, totDeb=0, n=0;
+      mesesC.forEach(m=>{
+        instsC.forEach(i=>{
+          const recs = (typeof RAW_DATA!=='undefined' && RAW_DATA[m]?.[i]?.debitos) || [];
+          recs.forEach(r=>{
+            if(fin && r.financiador!==fin) return;
+            totAd  += Math.abs(r.adeudado||0);
+            totDeb += Math.abs(r.debitado||0);
+            n++;
+          });
+        });
+      });
+      const pctC = totAd>0 ? (totDeb/totAd*100).toFixed(1) : '0.0';
+      const scope = `${n} comprobantes${inst?' · '+inst:' · todas'}${mes?' · '+mes:' · todos los meses'}${fin?' · '+(fin.length>24?fin.slice(0,24)+'…':fin):''}`;
+      const ctrl = document.getElementById('deb-control-total');
+      if(ctrl) ctrl.innerHTML = `
+        <div class="kpi-card k-blue" style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px">
+          <div>
+            <div class="kpi-label">Total Facturado (control)</div>
+            <div class="kpi-value">${fmt(totAd)}</div>
+            <div class="kpi-sub">suma de adeudado — ${scope}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="kpi-label">Debitado</div>
+            <div class="kpi-value" style="color:#b45309">${fmt(totDeb)}</div>
+            <div class="kpi-sub">${pctC}% sobre facturado</div>
+          </div>
+        </div>`;
+    }
+
     if(debTotalChart) debTotalChart.destroy();
     debTotalChart=new Chart(document.getElementById('deb-chart-total'),{
       type:'bar',
@@ -1868,29 +1905,24 @@ function buildDebitosCharts(){
     const subtitleEl = document.getElementById('deb-ranking-chart-subtitle');
     if(subtitleEl) subtitleEl.textContent = mes||'todos los meses';
 
+    // Montos reales desde RAW_DATA (misma fuente que el panel de detalle).
+    // Métrica: % = debitado / adeudado (lo debitado sobre lo facturado de la tanda).
+    const mesesR = mes ? [mes] : MESES_D;
+    const instsR = inst ? [inst] : getInsts();
     const fins = D.all_fins.map(fin=>{
-      const meses = mes ? [mes] : MESES_D;
-      let totalDeb=0, totalCn=0;
-      meses.forEach(m=>{
-        if(!inst){
-          const d = D.all_fins_evo[fin]?.[m] || {deb:0,neto:0};
-          totalDeb += d.deb; totalCn += d.neto;
-        } else {
-          const mIdx = MESES_D.indexOf(m);
-          const pct = D.heatmap[fin]?.[inst]?.[mIdx] || 0;
-          if(pct > 0){
-            const evo = D.all_fins_evo[fin]?.[m] || {deb:0,neto:0};
-            // estimate inst share proportionally
-            const totalPct = D.inst.reduce((a,i)=>a+(D.heatmap[fin]?.[i]?.[mIdx]||0),0);
-            if(totalPct > 0){
-              const share = pct / totalPct;
-              totalDeb += evo.deb * share;
-              totalCn  += evo.neto * share;
+      let totalDeb=0, totalAd=0;
+      mesesR.forEach(m=>{
+        instsR.forEach(i=>{
+          const recs = (typeof RAW_DATA!=='undefined' && RAW_DATA[m]?.[i]?.debitos) || [];
+          recs.forEach(r=>{
+            if(r.financiador === fin){
+              totalDeb += Math.abs(r.debitado||0);
+              totalAd  += Math.abs(r.adeudado||0);
             }
-          }
-        }
+          });
+        });
       });
-      const pct = totalCn > 0 ? totalDeb/totalCn*100 : 0;
+      const pct = totalAd > 0 ? totalDeb/totalAd*100 : 0;
       return {f:fin, deb:Math.round(totalDeb), pct:parseFloat(pct.toFixed(2))};
     }).filter(d=>d.deb>0 && (!finFilter || d.f===finFilter));
 
