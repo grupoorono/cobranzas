@@ -1935,24 +1935,37 @@ function buildDebitosCharts(){
     const subtitleEl = document.getElementById('deb-ranking-chart-subtitle');
     if(subtitleEl) subtitleEl.textContent = mes||'todos los meses';
 
-    // Montos reales desde RAW_DATA (misma fuente que el panel de detalle).
-    // Métrica: % = debitado / adeudado (lo debitado sobre lo facturado de la tanda).
+    // Montos reales desde RAW_DATA (débitos) y FACTURADO_DATA (total facturado).
+    // Métrica: % = debitado / total_facturado (sobre todo lo facturado, no solo filas con débito).
     const mesesR = mes ? [mes] : MESES_D;
     const instsR = inst ? [inst] : getInsts();
     const fins = D.all_fins.map(fin=>{
-      let totalDeb=0, totalAd=0;
+      let totalDeb=0, totalFact=0;
       mesesR.forEach(m=>{
         instsR.forEach(i=>{
+          // Débito: desde RAW_DATA (solo filas con débito)
           const recs = (typeof RAW_DATA!=='undefined' && RAW_DATA[m]?.[i]?.debitos) || [];
           recs.forEach(r=>{
             if(r.financiador === fin){
               totalDeb += Math.abs(r.debitado||0);
-              totalAd  += Math.abs(r.adeudado||0);
             }
           });
+          // Facturado total: desde FACTURADO_DATA (todas las filas del Excel)
+          if(FACTURADO_DATA && FACTURADO_DATA[m] && FACTURADO_DATA[m][fin] && FACTURADO_DATA[m][fin][i]){
+            totalFact += FACTURADO_DATA[m][fin][i];
+          }
         });
       });
-      const pct = totalAd > 0 ? totalDeb/totalAd*100 : 0;
+      // Si no hay FACTURADO_DATA, caer en suma de adeudado de filas con débito
+      if(totalFact === 0){
+        mesesR.forEach(m=>{
+          instsR.forEach(i=>{
+            const recs = (typeof RAW_DATA!=='undefined' && RAW_DATA[m]?.[i]?.debitos) || [];
+            recs.forEach(r=>{ if(r.financiador===fin) totalFact += Math.abs(r.adeudado||0); });
+          });
+        });
+      }
+      const pct = totalFact > 0 ? totalDeb/totalFact*100 : 0;
       return {f:fin, deb:Math.round(totalDeb), pct:parseFloat(pct.toFixed(2))};
     }).filter(d=>d.deb>0 && (!finFilter || d.f===finFilter));
 
