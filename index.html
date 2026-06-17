@@ -556,12 +556,13 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
         <th>Mes</th>
         <th class="r">Presupuestado</th>
         <th class="r">Cobrado + Débitos</th>
-        <th class="r">% Ppto</th>
+        <th class="r">Var. vs mes ant.</th>
+        <th class="r">% Cobr. c/Déb</th>
+        <th class="r">% Cobr. s/Déb</th>
         <th class="r">Cobrado (en $)</th>
         <th class="r">Debitado</th>
         <th class="r">% Débitos</th>
         <th class="r">Ppto No Cobrado</th>
-        <th class="r">Var. vs mes ant.</th>
       </tr></thead>
       <tbody id="comp-tbody"></tbody>
     </table>
@@ -1581,18 +1582,21 @@ function buildComparativo(){
       : '<span class="delta-neu">—</span>';
     const ncColor = nc<=0?'cell-green':'cell-brown';
     const pctColor = t.pct_neto>=100?'#166534':'#991b1b';
+    const pctCobrado = t.presup? t.cobrado/t.presup*100 : 0;
+    const pctCobColor = pctCobrado>=100?'#166534':'#991b1b';
     const tr = document.createElement('tr');
     if(mes==='Mayo') tr.style.fontWeight='600';
     tr.innerHTML=`
       <td><strong>${mes}</strong>${(getInsts().length===ALL_INSTS.length && t.presup<15e9)?'<span style="font-size:10px;color:#b45309;margin-left:6px">⚠ parcial</span>':''}</td>
       <td class="r">${fmtM(t.presup)}</td>
       <td class="r" style="color:#1a6b5a;font-weight:600">${fmtM(t.neto)}</td>
+      <td class="r">${deltaStr}</td>
       <td class="r"><span style="color:${pctColor};font-weight:700">${fmtPct(t.pct_neto)}</span></td>
+      <td class="r"><span style="color:${pctCobColor};font-weight:700">${fmtPct(pctCobrado)}</span></td>
       <td class="r">${fmtM(t.cobrado)}</td>
       <td class="r" style="color:#b45309">${fmtM(t.debitado)}</td>
       <td class="r">${fmtPct(t.pct_deb)}</td>
-      <td class="r ${ncColor}">${fmtM(nc)}</td>
-      <td class="r">${deltaStr}</td>`;
+      <td class="r ${ncColor}">${fmtM(nc)}</td>`;
     tbody.appendChild(tr);
     prevNeto = t.neto;
   });
@@ -1673,28 +1677,33 @@ function buildComparativo(){
     let prevN=null;
     months.forEach(mes=>{
       const d = MONTHLY_DATA[mes][inst];
-      if(!d){rows+=`<tr><td><strong>${mes}</strong></td><td class="r" colspan="6" style="color:#9ca3af">Sin datos</td></tr>`;prevN=null;return;}
+      if(!d){rows+=`<tr><td><strong>${mes}</strong></td><td class="r" colspan="8" style="color:#9ca3af">Sin datos</td></tr>`;prevN=null;return;}
       const delta = prevN!=null?d.neto-prevN:null;
-      const ds = delta!=null?`<span class="${delta>=0?'delta-up':'delta-down'}">${delta>=0?'↑':'↓'}${fmtM(Math.abs(delta))}</span>`:'—';
-      const pctConDeb = d.neto&&d.presup?(d.neto/d.presup*100).toFixed(1)+'%':'—';
-      const pctSinDeb = d.cobrado&&d.presup?(d.cobrado/d.presup*100).toFixed(1)+'%':'—';
-      const colorConDeb = d.presup&&d.neto?(d.neto/d.presup>=1?'#166534':'#991b1b'):'#374151';
-      const colorSinDeb = d.presup&&d.cobrado?(d.cobrado/d.presup>=1?'#166534':'#991b1b'):'#374151';
+      const ds = delta!=null?`<span class="${delta>=0?'delta-up':'delta-down'}">${delta>=0?'↑':'↓'} ${fmtM(Math.abs(delta))}</span>`:'<span class="delta-neu">—</span>';
+      const pctConDeb = d.presup? d.neto/d.presup*100 : 0;
+      const pctSinDeb = d.presup? d.cobrado/d.presup*100 : 0;
+      const pctDeb = d.neto? d.debitado/d.neto*100 : 0;
+      const colorConDeb = d.presup&&d.neto?(pctConDeb>=100?'#166534':'#991b1b'):'#374151';
+      const colorSinDeb = d.presup&&d.cobrado?(pctSinDeb>=100?'#166534':'#991b1b'):'#374151';
+      const ncColor = d.nc<=0?'cell-green':'cell-brown';
       rows+=`<tr>
         <td><strong>${mes}</strong></td>
         <td class="r">${fmtM(d.presup)}</td>
         <td class="r" style="color:#1a6b5a;font-weight:600">${fmtM(d.neto)}</td>
-        <td class="r" style="font-weight:700;color:${colorConDeb}">${pctConDeb}</td>
-        <td class="r">${fmtM(d.cobrado)}</td>
-        <td class="r" style="font-weight:700;color:${colorSinDeb}">${pctSinDeb}</td>
         <td class="r">${ds}</td>
+        <td class="r" style="font-weight:700;color:${colorConDeb}">${fmtPct(pctConDeb)}</td>
+        <td class="r" style="font-weight:700;color:${colorSinDeb}">${fmtPct(pctSinDeb)}</td>
+        <td class="r">${fmtM(d.cobrado)}</td>
+        <td class="r" style="color:#b45309">${fmtM(d.debitado)}</td>
+        <td class="r">${fmtPct(pctDeb)}</td>
+        <td class="r ${ncColor}">${fmtM(d.nc)}</td>
       </tr>`;
       prevN=d.neto;
     });
     card.innerHTML=`
       <div class="chart-card-head" style="background:${COLORS[ci]}"><h3>${inst}</h3><span>cobrado + débitos</span></div>
       <div class="comp-table-wrap"><table class="comp-table">
-        <thead><tr><th>Mes</th><th class="r">Presupuestado</th><th class="r">Cobrado+Deb</th><th class="r">% c/Déb</th><th class="r">Cobrado (en $)</th><th class="r">% s/Déb</th><th class="r">Var.</th></tr></thead>
+        <thead><tr><th>Mes</th><th class="r">Presupuestado</th><th class="r">Cobrado + Débitos</th><th class="r">Var. vs mes ant.</th><th class="r">% Cobr. c/Déb</th><th class="r">% Cobr. s/Déb</th><th class="r">Cobrado (en $)</th><th class="r">Debitado</th><th class="r">% Débitos</th><th class="r">Ppto No Cobrado</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>`;
     wrap.appendChild(card);
