@@ -2508,13 +2508,15 @@ function showApp(){
             const finData = typeof row.datos_facturado === 'string'
               ? JSON.parse(row.datos_facturado)
               : row.datos_facturado;
-            // finData = { fin: { inst: adeudado } }
-            // Merge bajo la clave mes
             FACTURADO_DATA[mes] = finData;
           } catch(e){ console.warn('datos_facturado parse error', mes, e); }
         });
       }
     } catch(e){ console.warn('Error cargando FACTURADO_DATA:', e); }
+    // Si el tab Débitos ya estaba abierto cuando llegaron los datos, refrescar el campo
+    if(window._debitosBuilt && typeof applyDebFilters === 'function'){
+      applyDebFilters();
+    }
   })();
 
   // Restaurar la pestaña en la que estaba el usuario antes de aplicar el filtro
