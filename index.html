@@ -2497,7 +2497,7 @@ function showApp(){
   // Cargar datos de facturado desde Supabase (para el campo de control del tab Débitos)
   (async () => {
     try {
-      const r = await supaFetch('archivos_mes?select=mes,datos_facturado&datos_facturado=not.is.null&activo=eq.true&order=created_at.asc');
+      const r = await supaFetch('archivos_mes?select=mes,datos_facturado&activo=eq.true&order=created_at.asc');
       const rows = await r.json();
       if(Array.isArray(rows) && rows.length){
         FACTURADO_DATA = {};
