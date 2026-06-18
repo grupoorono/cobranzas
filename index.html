@@ -385,28 +385,28 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
 <div class="kpi-row">
   <div class="kpi-card">
     <div class="kpi-label">Presupuestado</div>
-    <div class="kpi-value" id="kpi-presup">$23.127,3 M</div>
-    <div class="kpi-sub">Total período Mayo 2026</div>
+    <div class="kpi-value" id="kpi-presup">—</div>
+    <div class="kpi-sub">Total período —</div>
   </div>
   <div class="kpi-card k-green">
     <div class="kpi-label">Cobrado + Débitos</div>
-    <div class="kpi-value" id="kpi-neto">$24.385,1 M</div>
+    <div class="kpi-value" id="kpi-neto">—</div>
     <div class="kpi-sub">cobrado + debitado del período</div>
   </div>
   <div class="kpi-pct">
     <div class="kpi-label">% del Presupuesto</div>
-    <div class="kpi-pct-value" id="kpi-pct">105,44%</div>
+    <div class="kpi-pct-value" id="kpi-pct">—</div>
     <div class="kpi-sub">cobrado + débitos</div>
   </div>
   <div class="kpi-card k-blue">
     <div class="kpi-label">Cobrado (en $)</div>
-    <div class="kpi-value" id="kpi-cobrado" style="font-size:22px">$23.398,4 M</div>
-    <span class="kpi-badge kb-blue" id="kpi-cobrado-badge">101,17% del ppto (sin débitos)</span>
+    <div class="kpi-value" id="kpi-cobrado" style="font-size:22px">—</div>
+    <span class="kpi-badge kb-blue" id="kpi-cobrado-badge">—</span>
   </div>
   <div class="kpi-card k-amber">
     <div class="kpi-label">Importe Debitado Total</div>
-    <div class="kpi-value" id="kpi-deb">$986,7 M</div>
-    <span class="kpi-badge kb-amber" id="kpi-deb-badge">4,05% sobre cobrado</span>
+    <div class="kpi-value" id="kpi-deb">—</div>
+    <span class="kpi-badge kb-amber" id="kpi-deb-badge">—</span>
   </div>
 </div>
 
@@ -995,46 +995,21 @@ btnWrap.innerHTML='';
   allowedB.forEach(name=>btnWrap.appendChild(mkBtn(name,name)));
 })();
 
-// Inst table — replicar estilo PBI con celdas de color
-const itbody=document.getElementById('inst-tbody');
-const allowedInsts=getInsts();
-INST.filter(d=>allowedInsts.includes(d.name)).forEach(d=>{
-  const nc=d.presup-(d.cobrado+d.debitado);
-  const pd=pctOf(d.debitado,d.cobrado);
-  const pctConDeb = d.presup>0 ? (d.deb_cob/d.presup*100) : 0;
-  const pctSinDeb = d.presup>0 ? (d.cobrado/d.presup*100) : 0;
-  const ncClass=nc<0?'cell-brown':'cell-green';
-  const tr=document.createElement('tr');
-  tr.style.cursor='pointer';tr.title='Click para ver detalle';
-  tr.onclick=()=>openModal(d.name);
-  tr.innerHTML=`
-    <td><span class="ib">${d.name}</span></td>
-    <td class="r">${fmt(d.presup)}</td>
-    <td class="r cell-green">${fmt(d.deb_cob)}</td>
-    <td class="r"><span style="font-weight:700;color:${pctConDeb>=100?'#166534':'#991b1b'};background:${pctConDeb>=100?'#dcfce7':'#fee2e2'};padding:2px 7px;border-radius:3px;font-size:11px">${pctConDeb.toFixed(1)}%</span></td>
-    <td class="r">${fmt(d.cobrado)}</td>
-    <td class="r"><span style="font-weight:700;color:${pctSinDeb>=100?'#166534':'#991b1b'};background:${pctSinDeb>=100?'#dcfce7':'#fee2e2'};padding:2px 7px;border-radius:3px;font-size:11px">${pctSinDeb.toFixed(1)}%</span></td>
-    <td class="r cell-navy-light">${fmt(d.debitado)}</td>
-    <td class="r">${pctBadge(pd)}</td>
-    <td class="r ${ncClass}">${fmt(nc)}</td>`;
-  itbody.appendChild(tr);
-});
+// ── Tab Mes Anterior: se construye 100% desde Supabase ──
+function buildMesAnterior(instData, financData){
+  const allowedInsts = getInsts();
+  const instList = instData.filter(d=>allowedInsts.includes(d.name));
 
-makeSortable('inst-tbody');
-
-// ── KPIs Globales de Mes Anterior: recalculan según institución del usuario ──
-function renderMesAnteriorKPIs(){
-  const insts = getInsts();
-  const rows = INST.filter(d=>insts.includes(d.name));
-  const presup   = rows.reduce((s,d)=>s+d.presup,0);
-  const neto     = rows.reduce((s,d)=>s+d.deb_cob,0);
-  const cobrado  = rows.reduce((s,d)=>s+d.cobrado,0);
-  const debitado = rows.reduce((s,d)=>s+d.debitado,0);
+  // KPIs
+  const presup   = instList.reduce((s,d)=>s+d.presup,0);
+  const neto     = instList.reduce((s,d)=>s+(d.deb_cob||d.neto||0),0);
+  const cobrado  = instList.reduce((s,d)=>s+d.cobrado,0);
+  const debitado = instList.reduce((s,d)=>s+d.debitado,0);
   const pctNeto = presup ? neto/presup*100 : 0;
   const pctCob  = presup ? cobrado/presup*100 : 0;
   const pctDeb  = neto ? debitado/neto*100 : 0;
   const fmtM1 = n=>Math.round(n||0).toLocaleString('es-AR');
-  const pc = x=>x.toFixed(2).replace('.',',');
+  const pc = x=>parseFloat(x).toFixed(2).replace('.',',');
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
   set('kpi-presup','$'+fmtM1(presup));
   set('kpi-neto','$'+fmtM1(neto));
@@ -1043,81 +1018,132 @@ function renderMesAnteriorKPIs(){
   set('kpi-cobrado-badge',pc(pctCob)+'% del ppto (sin débitos)');
   set('kpi-deb','$'+fmtM1(debitado));
   set('kpi-deb-badge',pc(pctDeb)+'% sobre cobrado');
-}
-renderMesAnteriorKPIs();
 
-// Debit bars
-const maxD=Math.max(...INST.filter(d=>getInsts().includes(d.name)).map(d=>d.debitado));
-const dbWrap=document.getElementById('debit-bars');
-INST.filter(d=>getInsts().includes(d.name)).forEach((d,i)=>{
-  const w=(d.debitado/maxD*100).toFixed(1);
-  dbWrap.innerHTML+=`<div class="br-row"><div class="br-name">${d.name}</div><div class="br-track"><div class="br-fill bf-navy" style="width:0" data-w="${w}"></div></div><div class="br-val">${fmt(d.debitado)}</div></div>`;
-});
-
-// Financ table — si hay filtro por institución, recalcular los IMPORTES por financiador
-// desde el detalle (facturas+débitos) de esa institución; si no, usar los totales del grupo.
-const allowedInstsFin = getInsts();
-let finList;
-if(allowedInstsFin.length === 6){
-  finList = FINANC.map(d=>({name:d.name,presup:d.presup,cobrado:d.cobrado,debitado:d.debitado,deb_cob:d.deb_cob}));
-} else {
-  const agg = {};
-  allowedInstsFin.forEach(inst=>{
-    const dd = RAW_DATA['Mayo']?.[inst] || RAW_DATA[inst];
-    if(!dd) return;
-    [...(dd.facturas||[]),...(dd.debitos||[])].forEach(r=>{
-      const f=r.financiador; if(!f) return;
-      if(!agg[f]) agg[f]={name:f,presup:0,cobrado:0,debitado:0};
-      agg[f].presup   += r.adeudado||0;
-      agg[f].cobrado  += Math.abs(r.cobrado||0);
-      agg[f].debitado += Math.abs(r.debitado||0);
+  // Actualizar subtítulo del período
+  if(window._mesAnteriorNombre){
+    document.querySelectorAll('.kpi-sub').forEach(el=>{
+      if(el.textContent.includes('período')) el.textContent = 'Total período ' + window._mesAnteriorNombre;
     });
-  });
-  finList = Object.values(agg).map(d=>({...d, deb_cob:d.cobrado+d.debitado}));
-  finList.sort((a,b)=>b.deb_cob-a.deb_cob);
+  }
+
+  // Inst table
+  const itbody=document.getElementById('inst-tbody');
+  if(itbody){
+    itbody.innerHTML='';
+    instList.forEach(d=>{
+      const deb_cob = d.deb_cob || d.neto || 0;
+      const nc=d.presup-(d.cobrado+d.debitado);
+      const pd=pctOf(d.debitado,d.cobrado);
+      const pctConDeb = d.presup>0 ? (deb_cob/d.presup*100) : 0;
+      const pctSinDeb = d.presup>0 ? (d.cobrado/d.presup*100) : 0;
+      const ncClass=nc<0?'cell-brown':'cell-green';
+      const tr=document.createElement('tr');
+      tr.style.cursor='pointer'; tr.title='Click para ver detalle';
+      tr.onclick=()=>openModal(d.name);
+      tr.innerHTML=`
+        <td><span class="ib">${d.name}</span></td>
+        <td class="r">${fmt(d.presup)}</td>
+        <td class="r cell-green">${fmt(deb_cob)}</td>
+        <td class="r"><span style="font-weight:700;color:${pctConDeb>=100?'#166534':'#991b1b'};background:${pctConDeb>=100?'#dcfce7':'#fee2e2'};padding:2px 7px;border-radius:3px;font-size:11px">${pctConDeb.toFixed(1)}%</span></td>
+        <td class="r">${fmt(d.cobrado)}</td>
+        <td class="r"><span style="font-weight:700;color:${pctSinDeb>=100?'#166534':'#991b1b'};background:${pctSinDeb>=100?'#dcfce7':'#fee2e2'};padding:2px 7px;border-radius:3px;font-size:11px">${pctSinDeb.toFixed(1)}%</span></td>
+        <td class="r cell-navy-light">${fmt(d.debitado)}</td>
+        <td class="r">${pctBadge(pd)}</td>
+        <td class="r ${ncClass}">${fmt(nc)}</td>`;
+      itbody.appendChild(tr);
+    });
+    makeSortable('inst-tbody');
+  }
+
+  // Debit bars
+  const dbWrap=document.getElementById('debit-bars');
+  if(dbWrap){
+    dbWrap.innerHTML='';
+    const maxD=Math.max(...instList.map(d=>d.debitado),1);
+    instList.forEach(d=>{
+      const w=(d.debitado/maxD*100).toFixed(1);
+      dbWrap.innerHTML+=`<div class="br-row"><div class="br-name">${d.name}</div><div class="br-track"><div class="br-fill bf-navy" style="width:0" data-w="${w}"></div></div><div class="br-val">${fmt(d.debitado)}</div></div>`;
+    });
+  }
+
+  // NC bars
+  const ncData2=instList.map(d=>({name:d.name,val:d.presup-(d.cobrado+d.debitado)}));
+  const ncWrap=document.getElementById('nc-bars');
+  if(ncWrap){
+    ncWrap.innerHTML='';
+    const maxNC=Math.max(...ncData2.map(d=>Math.abs(d.val)),1);
+    ncData2.forEach(d=>{
+      const w=(Math.abs(d.val)/maxNC*100).toFixed(1);
+      const pos=d.val>=0;
+      const cls=pos?'bf-green':'bf-red';
+      const vc=pos?'br-val-green':'br-val-red';
+      ncWrap.innerHTML+=`<div class="br-row"><div class="br-name">${d.name}</div><div class="br-track"><div class="br-fill ${cls}" style="width:0" data-w="${w}"></div></div><div class="br-val ${vc}">${pos?'+':''}${fmt(d.val)}</div></div>`;
+    });
+  }
+
+  // Financiadores table
+  const ftbody=document.getElementById('fin-tbody');
+  if(ftbody){
+    ftbody.innerHTML='';
+    let finList2;
+    if(allowedInsts.length===6){
+      finList2=financData.map(d=>({...d}));
+    } else {
+      // Filtrar por institución desde RAW_DATA
+      // Buscar el mes activo en LIVE_MONTHLY_DATA o usar el último mes de RAW_DATA
+      const mesActivo = window._mesAnteriorNombre || Object.keys(RAW_DATA||{}).slice(-1)[0];
+      const agg={};
+      allowedInsts.forEach(inst=>{
+        const dd = (RAW_DATA[mesActivo]||{})[inst] || RAW_DATA[inst];
+        if(!dd) return;
+        [...(dd.facturas||[]),...(dd.debitos||[])].forEach(r=>{
+          const f=r.financiador; if(!f) return;
+          if(!agg[f]) agg[f]={name:f,presup:0,cobrado:0,debitado:0};
+          agg[f].presup   += r.adeudado||0;
+          agg[f].cobrado  += Math.abs(r.cobrado||0);
+          agg[f].debitado += Math.abs(r.debitado||0);
+        });
+      });
+      finList2=Object.values(agg).map(d=>({...d,deb_cob:d.cobrado+d.debitado}));
+      finList2.sort((a,b)=>b.deb_cob-a.deb_cob);
+    }
+    finList2.forEach(d=>{
+      const deb_cob=d.deb_cob||(d.cobrado+d.debitado);
+      const pd=pctOf(d.debitado,d.cobrado);
+      const nc=d.presup-(d.cobrado+d.debitado);
+      const ncClass=nc<0?'cell-brown':'cell-green';
+      const tr=document.createElement('tr');
+      tr.innerHTML=`
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.name}">${d.name}</td>
+        <td class="r">${fmtFull(d.presup)}</td>
+        <td class="r cell-green">${fmtFull(deb_cob)}</td>
+        <td class="r">${fmtFull(d.cobrado)}</td>
+        <td class="r cell-navy-light">${fmtFull(d.debitado)}</td>
+        <td class="r">${pctBadge(pd)}</td>
+        <td class="r ${ncClass}">${fmtFull(nc)}</td>`;
+      ftbody.appendChild(tr);
+    });
+    makeSortable('fin-tbody');
+  }
+
+  // Animate bars
+  setTimeout(()=>document.querySelectorAll('.br-fill[data-w]').forEach(el=>el.style.width=el.dataset.w+'%'),150);
 }
 
-const ftbody=document.getElementById('fin-tbody');
-finList.forEach(d=>{
-  const pd=pctOf(d.debitado,d.cobrado);
-  const nc=d.presup-(d.cobrado+d.debitado);
-  const ncClass=nc<0?'cell-brown':'cell-green';
-  const tr=document.createElement('tr');
-  tr.innerHTML=`
-    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.name}">${d.name}</td>
-    <td class="r">${fmtFull(d.presup)}</td>
-    <td class="r cell-green">${fmtFull(d.deb_cob)}</td>
-    <td class="r">${fmtFull(d.cobrado)}</td>
-    <td class="r cell-navy-light">${fmtFull(d.debitado)}</td>
-    <td class="r">${pctBadge(pd)}</td>
-    <td class="r ${ncClass}">${fmtFull(nc)}</td>`;
-  ftbody.appendChild(tr);
-});
-
-makeSortable('fin-tbody');
-
-// Resp
-const maxR=Math.max(...RESP.map(r=>Math.abs(r.val)));
-const rWrap=document.getElementById('resp-rows');
-RESP.forEach((r,i)=>{
-  const w=(Math.abs(r.val)/maxR*100).toFixed(1);
-  const pos=r.val>=0;
-  const bg=pos?'#1a6b5a':'#991b1b';
-  const vc=pos?'var(--green-cell)':'var(--red-soft)';
-  rWrap.innerHTML+=`<div class="rr"><div class="rr-rank">${i+1}</div><div class="rr-name">${r.name}</div><div class="rr-bw"><div class="rr-b" style="width:${w}%;background:${bg}"></div></div><div class="rr-val" style="color:${vc}">${pos?'':'-'}${fmt(Math.abs(r.val))}</div></div>`;
-});
-
-// NC bars
-const ncData=INST.filter(d=>getInsts().includes(d.name)).map(d=>({name:d.name,val:d.presup-(d.cobrado+d.debitado)}));
-const maxNC=Math.max(...ncData.map(d=>Math.abs(d.val)));
-const ncWrap=document.getElementById('nc-bars');
-ncData.forEach(d=>{
-  const w=(Math.abs(d.val)/maxNC*100).toFixed(1);
-  const pos=d.val>=0;
-  const cls=pos?'bf-green':'bf-red';
-  const vc=pos?'br-val-green':'br-val-red';
-  ncWrap.innerHTML+=`<div class="br-row"><div class="br-name">${d.name}</div><div class="br-track"><div class="br-fill ${cls}" style="width:0" data-w="${w}"></div></div><div class="br-val ${vc}">${pos?'+':''}${fmt(d.val)}</div></div>`;
-});
+// Tab Mes Anterior: muestra loading hasta que llegan datos de Supabase
+(function(){
+  const ids = ['inst-tbody','fin-tbody','debit-bars','nc-bars','resp-rows'];
+  ids.forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = '<div style="color:#9ca3af;padding:16px;text-align:center;font-size:12px">Cargando datos...</div>';
+  });
+  ['kpi-presup','kpi-neto','kpi-cobrado','kpi-deb'].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.textContent = '—';
+  });
+  ['kpi-pct'].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.textContent = '—';
+  });
+})();
 
 // Animate
 // Animate bars on load and auto-load Junio
@@ -2576,9 +2602,40 @@ function showApp(){
         });
       }
     } catch(e){ console.warn('Error cargando FACTURADO_DATA:', e); }
-    // Si el tab Débitos ya estaba abierto cuando llegaron los datos, refrescar el campo
+    // Si el tab Débitos ya estaba abierto cuando llegaron los datos, refrescar
     if(window._debitosBuilt && typeof applyDebFilters === 'function'){
       applyDebFilters();
+    }
+
+    // Actualizar tab Mes Anterior con el último mes marcado como "anterior" en Supabase
+    if(LIVE_MONTHLY_DATA && Object.keys(LIVE_MONTHLY_DATA).length > 0){
+      // Encontrar el último mes anterior (el más reciente en orden calendario)
+      const ORDEN_MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      const mesesAnteriores = Object.keys(LIVE_MONTHLY_DATA).sort((a,b)=>ORDEN_MESES.indexOf(a)-ORDEN_MESES.indexOf(b));
+      const ultimoMes = mesesAnteriores[mesesAnteriores.length - 1];
+      window._mesAnteriorNombre = ultimoMes;
+
+      // Convertir LIVE_MONTHLY_DATA[ultimoMes] al formato de INST
+      const mesData = LIVE_MONTHLY_DATA[ultimoMes];
+      if(mesData){
+        const instArr = Object.entries(mesData)
+          .filter(([k])=>k!=='TOTAL')
+          .map(([name,d])=>({name, presup:d.presup, cobrado:d.cobrado, debitado:d.debitado, deb_cob:d.neto, neto:d.neto}));
+
+        // Convertir LIVE_FINANC_DATA[ultimoMes] al formato de FINANC si disponible
+        // sino usar FINANC hardcodeado
+        const financArr2 = FINANC; // fallback al hardcodeado
+
+        // Actualizar título del tab
+        const tituloEl = document.querySelector('#page-mensual .sec-title');
+        if(tituloEl) tituloEl.textContent = 'Indicadores Globales — ' + ultimoMes;
+        const kpiSub = document.querySelector('#kpi-presup + .kpi-sub, .kpi-sub');
+        document.querySelectorAll('.kpi-sub').forEach(el=>{
+          if(el.textContent.includes('período')) el.textContent = 'Total período ' + ultimoMes;
+        });
+
+        buildMesAnterior(instArr, financArr2);
+      }
     }
   })();
 
