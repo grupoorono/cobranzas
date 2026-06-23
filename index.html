@@ -699,7 +699,6 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
               <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Comprobante</th>
               <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Fecha</th>
               <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Debitado</th>
-              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.8px">% Deb.</th>
             </tr>
           </thead>
           <tbody id="deb-detail-tbody"></tbody>
@@ -1574,18 +1573,16 @@ function computeDebitosData(){
     });
   });
 
-  // heatmap[fin][inst] = [pct por mes, en el mismo orden que 'meses']
+  // heatmap[fin][inst] = [{deb, fact, cobDeb} por mes, en el mismo orden que 'meses']
+  // Se guardan los importes crudos para poder sumar entre meses y dividir UNA sola vez en el render.
   const heatmap = {};
   Object.keys(heatmapRaw).forEach(fin=>{
     heatmap[fin] = {};
     INSTS.forEach(inst=>{
       heatmap[fin][inst] = meses.map(m=>{
         const c = heatmapRaw[fin] && heatmapRaw[fin][inst] && heatmapRaw[fin][inst][m];
-        if(!c) return 0;
         const fact = ((FACT[m]||{})[fin]||{})[inst] || 0;
-        const neto = pickNeto(fact, c._cobDeb);
-        if(neto<=0) return 0;
-        return +(c.deb/neto*100).toFixed(1);
+        return { deb: c ? c.deb : 0, fact: fact, cobDeb: c ? c._cobDeb : 0 };
       });
     });
   });
@@ -2176,13 +2173,18 @@ function buildDebitosCharts(){
 
     const rows = baseFins.map(fin=>{
       const instPcts = INST_COLS.map(inst=>{
-        const pcts = D.heatmap[fin]?.[inst]||[0,0,0,0,0];
+        const cells = D.heatmap[fin]?.[inst];
+        if(!cells) return 0;
+        // % = débito / facturado (sumado entre los meses elegidos). Fallback N/P: cobrado+débito si no hay facturado.
+        let sumDeb=0, sumFact=0, sumCobDeb=0;
         if(hasMes){
-          return pcts[mesIdx]||0;
+          const c = cells[mesIdx];
+          if(c){ sumDeb=c.deb; sumFact=c.fact; sumCobDeb=c.cobDeb; }
         } else {
-          const vals = pcts.filter(v=>v>0);
-          return vals.length ? vals.reduce((a,v)=>a+v,0)/vals.length : 0;
+          cells.forEach(c=>{ if(c){ sumDeb+=c.deb; sumFact+=c.fact; sumCobDeb+=c.cobDeb; } });
         }
+        const neto = sumFact>0 ? sumFact : sumCobDeb;
+        return neto>0 ? +(sumDeb/neto*100).toFixed(1) : 0;
       });
       const avgAll = instPcts.filter(v=>v>0);
       return {fin, instPcts, avg: avgAll.length ? avgAll.reduce((a,v)=>a+v,0)/avgAll.length : 0};
@@ -2340,23 +2342,21 @@ window.showDebDetail = function(financiador){
   }
 
   rows.sort((a,b)=>Math.abs(b.debitado)-Math.abs(a.debitado));
-  let totAd=0, totDeb=0;
+  let totDeb=0, totCob=0;
   tbody.innerHTML = rows.map(r=>{
-    const ad = Math.abs(r.adeudado||0);
     const deb = Math.abs(r.debitado||0);
-    const pct = ad>0 ? (deb/ad*100).toFixed(1)+'%' : '—';
-    totAd+=ad; totDeb+=deb;
+    const cob = Math.abs(r.cobrado||0);
+    totDeb+=deb; totCob+=cob;
     return `<tr style="border-bottom:1px solid var(--gray-200)">
       <td style="padding:6px 12px;font-size:11px;white-space:nowrap"><span style="background:rgba(14,124,123,.15);color:#1a6b5a;padding:1px 5px;border-radius:3px;font-weight:600;font-size:10px">${r.mes||'Mayo'}</span></td>
       <td style="padding:6px 12px;font-size:11px"><span style="background:rgba(14,124,123,.15);color:#1a6b5a;padding:1px 6px;border-radius:3px;font-weight:600">${r.inst}</span></td>
       <td style="padding:6px 12px;font-size:11px;white-space:nowrap">${r.comprobante||'—'}</td>
       <td style="padding:6px 12px;font-size:11px;color:#6b7280;white-space:nowrap">${r.fecha_fact||'—'}</td>
       <td style="padding:6px 12px;font-size:11px;text-align:right;font-variant-numeric:tabular-nums;color:#b45309;font-weight:600">${deb?fmtFull2(deb):'—'}</td>
-      <td style="padding:6px 12px;font-size:11px;text-align:right;font-weight:600;color:${SEMAFORO(parseFloat(pct)||0)}">${pct}</td>
     </tr>`;
   }).join('');
 
-  footer.innerHTML = `${rows.length} comprobantes | Debitado: $${fmtFull2(totDeb)} | %: ${totAd>0?(totDeb/totAd*100).toFixed(1)+'%':'—'}`;
+  footer.innerHTML = `${rows.length} comprobantes | Debitado: $${fmtFull2(totDeb)}`;
   empty.style.display='none';
   wrap.style.display='block';
 };
