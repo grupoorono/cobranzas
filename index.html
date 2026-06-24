@@ -547,7 +547,27 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
 <div id="page-comparativo" class="page-content">
 <main>
 
-<div class="sec-title">KPIs Mensuales — Enero a Mayo 2026</div>
+<!-- FILTRO FINANCIADOR COMPARATIVO -->
+<div class="deb-filter-bar" style="margin-bottom:14px">
+  <div class="deb-fb-title">🔎 Filtrar</div>
+  <div class="deb-field deb-field-grow">
+    <span class="deb-field-ico">💳</span>
+    <input id="comp-fin-input" class="deb-ctrl deb-ctrl-input" list="comp-fin-list" placeholder="Escribí un financiador…" oninput="onCompFinChange()" autocomplete="off">
+    <datalist id="comp-fin-list"></datalist>
+    <button class="deb-clear" type="button" onclick="clearCompFin()" title="Limpiar financiador">×</button>
+  </div>
+  <button class="deb-reset" type="button" onclick="clearCompFin()">Limpiar</button>
+</div>
+<div id="comp-fin-badge" style="display:none;margin-bottom:10px">
+  <span style="background:#dbeafe;color:#1e40af;font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;display:inline-flex;align-items:center;gap:6px">
+    <span>💳</span>
+    <span id="comp-fin-badge-name"></span>
+    <span onclick="clearCompFin()" style="cursor:pointer;opacity:.7;font-size:14px;margin-left:2px">×</span>
+  </span>
+  <span style="font-size:11px;color:var(--gray-500);margin-left:8px">— mostrando datos de este financiador</span>
+</div>
+
+<div class="sec-title" id="comp-sec-title">KPIs Mensuales — Enero a Mayo 2026</div>
 <div class="chart-card">
   <div class="chart-card-head"><h3>Resumen por Mes</h3><span>todos los valores en millones $</span></div>
   <div class="comp-table-wrap">
@@ -1626,6 +1646,7 @@ function switchPageMobile(page, el){
   document.getElementById('page-'+page).classList.add('active');
   el.classList.add('active');
   if(page==='comparativo' && !window._compBuilt){buildComparativo();window._compBuilt=true;}
+  else if(page==='comparativo'){populateCompFinList();}
   if(page==='junio' && !junioLoaded){loadJunio();}
   if(page==='debitos' && !window._debitosBuilt){buildDebitos();window._debitosBuilt=true;}
   if(page==='responsables' && !window._respLoaded){loadResponsables();window._respLoaded=true;}
@@ -1641,7 +1662,7 @@ function switchPage(page){
   if(page==='comparativo' && !window._compBuilt){
     buildComparativo();
     window._compBuilt=true;
-  }
+  } else if(page==='comparativo'){populateCompFinList();}
   if(page==='junio' && !junioLoaded){loadJunio();}
   if(page==='debitos' && !window._debitosBuilt){buildDebitos();window._debitosBuilt=true;}
   if(page==='responsables' && !window._respLoaded){loadResponsables();window._respLoaded=true;}
@@ -1678,27 +1699,94 @@ const fmtM=n=>{
 };
 const fmtPct=n=>n!=null?n.toFixed(2)+'%':'—';
 
+// ── FILTRO FINANCIADOR COMPARATIVO ──
+let _compFinActivo = '';
+
+function onCompFinChange(){
+  const val = (document.getElementById('comp-fin-input')?.value||'').trim();
+  // Solo aplicar si coincide exactamente con un financiador conocido (o está vacío)
+  const allFins = getAllCompFins();
+  if(!val || allFins.includes(val)){
+    _compFinActivo = val;
+    renderCompConFiltro();
+    // Badge
+    const badge = document.getElementById('comp-fin-badge');
+    const badgeName = document.getElementById('comp-fin-badge-name');
+    if(val && badge && badgeName){ badgeName.textContent = val; badge.style.display='block'; }
+    else if(badge){ badge.style.display='none'; }
+  }
+}
+
+function clearCompFin(){
+  _compFinActivo = '';
+  const inp = document.getElementById('comp-fin-input');
+  if(inp) inp.value = '';
+  const badge = document.getElementById('comp-fin-badge');
+  if(badge) badge.style.display='none';
+  renderCompConFiltro();
+}
+
+function getAllCompFins(){
+  // Colectar todos los financiadores disponibles en LIVE_FINANC_DATA
+  const fins = new Set();
+  if(LIVE_FINANC_DATA){
+    Object.values(LIVE_FINANC_DATA).forEach(arr=>{
+      (arr||[]).forEach(d=>{ if(d.name) fins.add(d.name); });
+    });
+  }
+  return [...fins].sort((a,b)=>a.localeCompare(b,'es'));
+}
+
+function populateCompFinList(){
+  const dl = document.getElementById('comp-fin-list');
+  if(!dl || dl.children.length) return;
+  getAllCompFins().forEach(fin=>{
+    const opt = document.createElement('option'); opt.value = fin; dl.appendChild(opt);
+  });
+}
+
 function buildComparativo(){
+  // Poblar datalist de financiadores (se hace una sola vez)
+  setTimeout(populateCompFinList, 200);
+  renderCompConFiltro();
+}
+
+function renderCompConFiltro(){
+  const fin = _compFinActivo;
+
   // Usar LIVE_MONTHLY_DATA (Supabase) si está disponible, sino caer en MONTHLY_DATA hardcodeado
   function getMonthData(mes){ return (LIVE_MONTHLY_DATA && LIVE_MONTHLY_DATA[mes]) || MONTHLY_DATA[mes]; }
   const allMonths = [...new Set([
     ...Object.keys(LIVE_MONTHLY_DATA || {}),
     ...Object.keys(MONTHLY_DATA)
   ])];
-  // Ordenar por mes calendario
   const ORDEN = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const months = ORDEN.filter(m => allMonths.includes(m) && getMonthData(m));
 
-  // Total del mes según institución del usuario (si ve las 6, usa el TOTAL precalculado)
+  // Obtener totales del mes — con o sin filtro de financiador
   function monthTotal(mes){
+    // Si hay filtro de financiador, usar LIVE_FINANC_DATA para ese mes
+    if(fin){
+      const financArr = (LIVE_FINANC_DATA && LIVE_FINANC_DATA[mes]) || [];
+      const d = financArr.find(f=>f.name===fin);
+      if(!d) return {presup:0,cobrado:0,debitado:0,neto:0,nc:0,pct_neto:0,pct_cobrado:0,pct_deb:0};
+      const neto = d.deb_cob || (d.cobrado+d.debitado);
+      const presup = d.presup||0;
+      const cobrado = d.cobrado||0;
+      const debitado = d.debitado||0;
+      const nc = presup - neto;
+      return {presup, cobrado, debitado, neto, nc,
+        pct_neto:   presup ? neto/presup*100 : 0,
+        pct_cobrado:presup ? cobrado/presup*100 : 0,
+        pct_deb:    neto   ? debitado/neto*100 : 0};
+    }
     const data = getMonthData(mes);
     if(!data) return {presup:0,cobrado:0,debitado:0,neto:0,nc:0,pct_neto:0,pct_cobrado:0,pct_deb:0};
     const insts = getInsts();
     if(insts.length === ALL_INSTS.length) return data.TOTAL || data;
     let presup=0,cobrado=0,debitado=0,neto=0,nc=0;
     insts.forEach(inst=>{
-      const d = data[inst];
-      if(!d) return;
+      const d = data[inst]; if(!d) return;
       presup+=d.presup; cobrado+=d.cobrado; debitado+=d.debitado; neto+=d.neto; nc+=(d.nc||0);
     });
     return {presup,cobrado,debitado,neto,nc,
@@ -1707,10 +1795,33 @@ function buildComparativo(){
       pct_deb: neto? debitado/neto*100 : 0};
   }
 
+  // Para tablas por institución cuando hay filtro de financiador: usar RAW_DATA
+  function instDataForFin(mes, inst){
+    if(!fin) return null; // usar path normal
+    const raw = RAW_DATA[mes] && RAW_DATA[mes][inst];
+    if(!raw) return null;
+    let presup=0,cobrado=0,debitado=0,neto=0;
+    [...(raw.facturas||[]),...(raw.debitos||[])].forEach(r=>{
+      if((r.financiador||'').trim() !== fin) return;
+      presup   += Math.abs(r.adeudado||0);
+      cobrado  += Math.abs(r.cobrado||0);
+      debitado += Math.abs(r.debitado||0);
+    });
+    neto = cobrado + debitado;
+    return {presup, cobrado, debitado, neto, nc: presup-neto};
+  }
+
+  // Actualizar título de sección
+  const secTitle = document.getElementById('comp-sec-title');
+  if(secTitle) secTitle.textContent = fin
+    ? `KPIs Mensuales — ${fin}`
+    : `KPIs Mensuales — ${months.length ? months[0]+' a '+months[months.length-1]+' 2026' : '2026'}`;
+
   // ── SUMMARY TABLE ──
   const tbody = document.getElementById('comp-tbody');
+  tbody.innerHTML = '';
   let prevNeto = null;
-  months.forEach((mes,i)=>{
+  months.forEach((mes)=>{
     const t = monthTotal(mes);
     const nc = t.nc;
     const delta = prevNeto!=null ? t.neto - prevNeto : null;
@@ -1720,9 +1831,8 @@ function buildComparativo(){
     const ncColor = nc<=0?'cell-green':'cell-brown';
     const pctColor = t.pct_neto>=100?'#166534':'#991b1b';
     const tr = document.createElement('tr');
-    if(mes==='Mayo') tr.style.fontWeight='600';
     tr.innerHTML=`
-      <td><strong>${mes}</strong>${(getInsts().length===ALL_INSTS.length && t.presup<15e9)?'<span style="font-size:10px;color:#b45309;margin-left:6px">⚠ parcial</span>':''}</td>
+      <td><strong>${mes}</strong>${(!fin && getInsts().length===ALL_INSTS.length && t.presup<15e9)?'<span style="font-size:10px;color:#b45309;margin-left:6px">⚠ parcial</span>':''}</td>
       <td class="r">${fmtM(t.presup)}</td>
       <td class="r" style="color:#1a6b5a;font-weight:600">${fmtM(t.neto)}</td>
       <td class="r"><span style="color:${pctColor};font-weight:700">${fmtPct(t.pct_neto)}</span></td>
@@ -1739,6 +1849,11 @@ function buildComparativo(){
     plugins:{legend:{labels:{color:'#374151',font:{family:"'Inter',sans-serif",size:11}}},tooltip:{titleFont:{family:"'Inter',sans-serif"},bodyFont:{family:"'Inter',sans-serif"}}},
     scales:{x:{ticks:{color:'#6b7280',font:{family:"'Inter',sans-serif",size:11}},grid:{display:false}},y:{ticks:{color:'#6b7280',font:{family:"'Inter',sans-serif",size:10}},grid:{color:'rgba(0,0,0,.06)'}}}
   };
+
+  // Destruir gráficos previos si existen
+  ['chart-trend','chart-pct','chart-deb','chart-pctdeb'].forEach(id=>{
+    const c = Chart.getChart(id); if(c) c.destroy();
+  });
 
   // ── CHART 1: Cobrado+Débitos vs Presupuestado ──
   new Chart(document.getElementById('chart-trend'),{
@@ -1801,17 +1916,22 @@ function buildComparativo(){
     options:{...chartDefaults,responsive:true,scales:{...chartDefaults.scales,y:{...chartDefaults.scales.y,ticks:{...chartDefaults.scales.y.ticks,callback:v=>parseFloat(v.toFixed(2))+'%'}}}}
   });
 
-  // ── CHART 5: Por institución ──
   // ── PER-INST TABLES ──
   const wrap = document.getElementById('inst-comp-tables');
+  wrap.innerHTML = '';
   getInsts().forEach((inst,ci)=>{
     const card = document.createElement('div');
     card.className='chart-card';
     let rows='';
     let prevN=null;
     months.forEach(mes=>{
-      const data = getMonthData(mes); const d = data ? data[inst] : null;
-      if(!d){rows+=`<tr><td><strong>${mes}</strong></td><td class="r" colspan="6" style="color:#9ca3af">Sin datos</td></tr>`;prevN=null;return;}
+      let d;
+      if(fin){
+        d = instDataForFin(mes, inst);
+      } else {
+        const data = getMonthData(mes); d = data ? data[inst] : null;
+      }
+      if(!d||(!d.presup&&!d.neto)){rows+=`<tr><td><strong>${mes}</strong></td><td class="r" colspan="6" style="color:#9ca3af">Sin datos</td></tr>`;prevN=null;return;}
       const delta = prevN!=null?d.neto-prevN:null;
       const ds = delta!=null?`<span class="${delta>=0?'delta-up':'delta-down'}">${delta>=0?'↑':'↓'}${fmtM(Math.abs(delta))}</span>`:'—';
       const pctConDeb = d.neto&&d.presup?(d.neto/d.presup*100).toFixed(1)+'%':'—';
@@ -1830,7 +1950,7 @@ function buildComparativo(){
       prevN=d.neto;
     });
     card.innerHTML=`
-      <div class="chart-card-head" style="background:${COLORS[ci]}"><h3>${inst}</h3><span>cobrado + débitos</span></div>
+      <div class="chart-card-head" style="background:${COLORS[ci]}"><h3>${inst}</h3><span>${fin?fin:'cobrado + débitos'}</span></div>
       <div class="comp-table-wrap"><table class="comp-table">
         <thead><tr><th>Mes</th><th class="r">Presupuestado</th><th class="r">Cobrado+Deb</th><th class="r">% c/Déb</th><th class="r">Cobrado (en $)</th><th class="r">% s/Déb</th><th class="r">Var.</th></tr></thead>
         <tbody>${rows}</tbody>
