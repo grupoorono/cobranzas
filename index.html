@@ -3011,10 +3011,8 @@ function logout(){
 async function checkFirstLogin(){
   if(!currentUser) return;
   try{
-    const resp = await supaFetch(`usuarios?usuario=eq.${encodeURIComponent(currentUser.usuario)}&select=password`);
-    const data = await resp.json();
-    const pw = (data && data[0]) ? (data[0].password||'') : '';
-    if(!pw){ showChangePassword(true); }   // sin contraseña => primer ingreso obligatorio
+    const needs = sessionStorage.getItem('go_needs_password');
+    if(needs === 'true'){ showChangePassword(true); }
   }catch(e){}
 }
 
@@ -3049,8 +3047,24 @@ window.submitPassword = async function(force){
   if(p1.length<4){ show('La contraseña debe tener al menos 4 caracteres','#f87171'); return; }
   if(p1!==p2){ show('Las contraseñas no coinciden','#f87171'); return; }
   try{
-    const resp = await supaFetch(`usuarios?usuario=eq.${encodeURIComponent(currentUser.usuario)}`, {method:'PATCH', body:JSON.stringify({password:p1})});
-    if(resp.ok){
+    const resp = await fetch(
+      'https://ycbhlgbubkryorfejodn.supabase.co/functions/v1/super-service',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPA_KEY}`
+        },
+        body: JSON.stringify({
+          action: 'change_password',
+          usuario: currentUser.usuario,
+          password: p1
+        })
+      }
+    );
+    const data = await resp.json();
+    if(resp.ok && data.ok){
+      sessionStorage.removeItem('go_needs_password');
       show('✅ Contraseña guardada correctamente','#4ade80');
       setTimeout(()=>{ const m=document.getElementById('pwd-modal-bg'); if(m) m.remove(); }, 900);
     } else { show('Error al guardar la contraseña','#f87171'); }
