@@ -47,7 +47,7 @@ body{background:#0d1b2e;min-height:100vh;display:flex;align-items:center;justify
 </div>
 
 <script>
-const SUPA_URL = 'https://ycbhlgbubkryorfejodn.supabase.co';
+const EDGE_URL = 'https://ycbhlgbubkryorfejodn.supabase.co/functions/v1/super-service';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InljYmhsZ2J1YmtyeW9yZmVqb2RuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNTc3NTQsImV4cCI6MjA5NjczMzc1NH0.bjXhjf8FcnZBpq_VWC3QHVqHM1M423iQpn61pcxfyLc';
 
 // Si ya tiene sesión va directo al dashboard
@@ -68,25 +68,27 @@ async function doLogin(){
   err.style.display = 'none';
 
   try{
-    // Query Supabase for matching user
-    const resp = await fetch(
-      `${SUPA_URL}/rest/v1/usuarios?usuario=eq.${encodeURIComponent(user)}&select=*`,
-      { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` } }
-    );
+    const resp = await fetch(EDGE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPA_KEY}`
+      },
+      body: JSON.stringify({ usuario: user, password: pass })
+    });
+
     const data = await resp.json();
 
-    if(!data.length){ showErr('Usuario o contraseña incorrectos'); btn.textContent='Ingresar'; btn.disabled=false; return; }
+    if(!resp.ok || !data.ok){
+      showErr('Usuario o contraseña incorrectos');
+      btn.textContent='Ingresar'; btn.disabled=false; return;
+    }
 
-    const u = data[0];
-
-    if(u.password !== pass){ showErr('Usuario o contraseña incorrectos'); btn.textContent='Ingresar'; btn.disabled=false; return; }
-    if(!u.activo){ showErr('Usuario inactivo. Contactá al administrador.'); btn.textContent='Ingresar'; btn.disabled=false; return; }
-
-    // Save session
+    const u = data.user;
     sessionStorage.setItem('go_session', JSON.stringify({
-      id: u.id,
-      usuario: u.usuario,
-      tipo: u.tipo,
+      id:       u.id,
+      usuario:  u.usuario,
+      tipo:     u.tipo,
       instituciones: {
         PARQUE:   u.parque,
         NIÑOS:    u.ninos,
