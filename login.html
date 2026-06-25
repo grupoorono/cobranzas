@@ -50,7 +50,6 @@ body{background:#0d1b2e;min-height:100vh;display:flex;align-items:center;justify
 const EDGE_URL = 'https://ycbhlgbubkryorfejodn.supabase.co/functions/v1/super-service';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InljYmhsZ2J1YmtyeW9yZmVqb2RuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNTc3NTQsImV4cCI6MjA5NjczMzc1NH0.bjXhjf8FcnZBpq_VWC3QHVqHM1M423iQpn61pcxfyLc';
 
-// Si ya tiene sesión va directo al dashboard
 if(sessionStorage.getItem('go_session')){
   window.location.replace('index.html');
 }
@@ -85,6 +84,14 @@ async function doLogin(){
     }
 
     const u = data.user;
+
+    // Guardar si necesita crear contraseña
+    if(!u.has_password){
+      sessionStorage.setItem('go_needs_password', 'true');
+    } else {
+      sessionStorage.removeItem('go_needs_password');
+    }
+
     sessionStorage.setItem('go_session', JSON.stringify({
       id:       u.id,
       usuario:  u.usuario,
