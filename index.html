@@ -2823,6 +2823,21 @@ async function supaFetch(path, opts={}){
   return fetch(`${SUPA_URL}/rest/v1/${path}`, {...opts, headers});
 }
 
+// [EDGE] Llama al Edge Function super-service (usa service_role, bypassa RLS).
+// Toda escritura/lectura admin sobre archivos_mes pasa por acá para no exponer
+// la tabla a la anon key. Lanza Error si la operación falla.
+async function edgeCall(payload){
+  const resp = await fetch(`${SUPA_URL}/functions/v1/super-service`, {
+    method:'POST',
+    headers: {'Content-Type':'application/json', 'Authorization': `Bearer ${SUPA_KEY}`},
+    body: JSON.stringify(payload)
+  });
+  let data;
+  try { data = await resp.json(); } catch(_){ data = { ok:false, error:'Respuesta inválida del servidor' }; }
+  if(!resp.ok || !data.ok) throw new Error(data.error || 'Error en la operación');
+  return data;
+}
+
 window.addEventListener('load', ()=>{
   const saved = sessionStorage.getItem('go_session');
   if(saved){
@@ -3315,9 +3330,10 @@ async function loadAdminConfig(){
 async function loadAdminMes(){
   const content = document.getElementById('admin-content');
 
-  // Load existing months from Supabase
-  const resp = await supaFetch('archivos_mes?select=id,mes,tipo,activo,created_at&order=created_at.desc');
-  const meses = await resp.json();
+  // Load existing months via Edge Function (service_role ve activos e inactivos).
+  let meses = [];
+  try { meses = (await edgeCall({action:'list_mes'})).registros || []; }
+  catch(e){ meses = []; }
 
   content.innerHTML = `
     <div style="color:#e0eaf4;font-weight:600;font-size:14px;margin-bottom:6px">📅 Gestión de Meses</div>
@@ -3422,13 +3438,15 @@ async function loadConfigPaso2(){
 }
 
 async function toggleMes(id, activo){
-  await supaFetch(`archivos_mes?id=eq.${id}`, {method:'PATCH', body:JSON.stringify({activo:!activo})});
+  try { await edgeCall({action:'toggle_mes', id, activo: !activo}); }
+  catch(e){ alert('Error al cambiar el estado: '+e.message); }
   loadAdminMes();
 }
 
 async function eliminarMes(id, nombre){
   if(!confirm(`¿Eliminar definitivamente "${nombre}"? Esta acción no se puede deshacer.`)) return;
-  await supaFetch(`archivos_mes?id=eq.${id}`, {method:'DELETE'});
+  try { await edgeCall({action:'delete_mes', id}); }
+  catch(e){ alert('Error al eliminar: '+e.message); }
   loadAdminMes();
 }
 
@@ -3574,16 +3592,9 @@ async function procesarExcel(){
       activo: true
     };
 
-    const saveResp = await supaFetch('archivos_mes', {
-      method:'POST',
-      body: JSON.stringify(body),
-      headers: {'Prefer':'return=representation'}
-    });
-
-    if(!saveResp.ok){
-      const err = await saveResp.json();
-      throw new Error(err.message||'Error al guardar');
-    }
+    // [EDGE] El insert a archivos_mes ahora pasa por el Edge Function super-service
+    // (service_role bypassa RLS). El cliente ya no escribe directo a la tabla.
+    await edgeCall({ action:'save_mes', registro: body });
 
     setProgress(100, 'Guardado correctamente');
     document.getElementById('mes-success').textContent = `✅ ${nombre} guardado correctamente en Supabase (${instArr.length} instituciones, ${financArr.length} financiadores). Actualizando tablero…`;
