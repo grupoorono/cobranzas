@@ -1014,14 +1014,47 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
   #page-iapos .chart-wrap{position:relative;height:300px}
   #page-iapos .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   @media(max-width:820px){#page-iapos .charts-grid{grid-template-columns:1fr}}
+  /* ---- Filtro de meses con selección múltiple ---- */
+  #page-iapos .iapms{position:relative;display:inline-block}
+  #page-iapos .iapms-btn{display:inline-flex;align-items:center;gap:10px;justify-content:space-between;background:var(--navy);color:#fff;border:none;border-radius:7px;padding:8px 13px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;min-width:210px;text-align:left}
+  #page-iapos .iapms-btn .iapms-caret{font-size:9px;opacity:.85}
+  #page-iapos .iapms-panel{display:none;position:absolute;z-index:80;top:calc(100% + 6px);left:0;background:#fff;border:1px solid var(--gray-300);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.16);width:255px;padding:8px}
+  #page-iapos .iapms.open .iapms-panel{display:block}
+  #page-iapos .iapms-actions{display:flex;flex-wrap:wrap;gap:5px;padding:2px 2px 8px;border-bottom:1px solid var(--gray-200);margin-bottom:4px}
+  #page-iapos .iapms-actions button{background:var(--gray-100);border:1px solid var(--gray-200);border-radius:5px;padding:4px 8px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;color:var(--navy);cursor:pointer}
+  #page-iapos .iapms-actions button:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
+  #page-iapos .iapms-list{max-height:265px;overflow-y:auto}
+  #page-iapos .iapms-year{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.6px;padding:8px 6px 3px}
+  #page-iapos .iapms-year button{background:none;border:none;font-family:'Inter',sans-serif;font-size:10px;font-weight:600;color:var(--green-cell);cursor:pointer;text-transform:none;letter-spacing:0;padding:0}
+  #page-iapos .iapms-year button:hover{text-decoration:underline}
+  #page-iapos .iapms-opt{display:flex;align-items:center;gap:9px;padding:6px 7px;border-radius:6px;font-size:13px;font-weight:500;color:var(--navy);cursor:pointer}
+  #page-iapos .iapms-opt:hover{background:#eef4fa}
+  #page-iapos .iapms-opt input{accent-color:var(--navy);width:15px;height:15px;cursor:pointer;flex:none;margin:0}
+  #page-iapos .iapms-none{padding:26px 10px;text-align:center;color:var(--gray-500);font-size:13px}
+  #page-iapos .ch-note{font-size:11px;font-weight:500;color:var(--gray-500);margin-left:6px}
+  @media(max-width:640px){#page-iapos .iapms,#page-iapos .iapms-btn{width:100%}#page-iapos .iapms-panel{width:100%}}
   </style>
 
   <div id="iap-status" class="iap-status">Cargando datos de IAPOS…</div>
   <div id="iap-body" style="display:none">
 
     <div class="iap-controls">
-      <label for="iap-sel-periodo">Mes:</label>
-      <select id="iap-sel-periodo" class="iap-select" onchange="IAP.onPeriodo()"></select>
+      <label>Meses:</label>
+      <div class="iapms" id="iap-ms">
+        <button type="button" class="iapms-btn" id="iap-ms-btn" onclick="IAP.msToggle(event)">
+          <span id="iap-ms-lbl">Todos los meses</span><span class="iapms-caret">&#9660;</span>
+        </button>
+        <div class="iapms-panel" id="iap-ms-panel">
+          <div class="iapms-actions">
+            <button type="button" onclick="IAP.msAll()">Todos</button>
+            <button type="button" onclick="IAP.msNone()">Ninguno</button>
+            <button type="button" onclick="IAP.msLast(1)">&Uacute;ltimo mes</button>
+            <button type="button" onclick="IAP.msLast(3)">&Uacute;ltimos 3</button>
+            <button type="button" onclick="IAP.msLast(12)">&Uacute;ltimos 12</button>
+          </div>
+          <div class="iapms-list" id="iap-ms-list"></div>
+        </div>
+      </div>
       <span id="iap-feed" class="iap-feed" title="Última carga del feed IAPOS"></span>
     </div>
 
@@ -1045,7 +1078,7 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
 
     <div class="iap-sec">Tendencias</div>
     <div class="chart-box" style="margin-bottom:14px">
-      <h3>Evolución del Total IAPOS por mes</h3>
+      <h3>Evolución del Total IAPOS por mes<span id="iap-ch-note" class="ch-note"></span></h3>
       <div class="chart-wrap"><canvas id="iap-ch-total"></canvas></div>
     </div>
     <div class="charts-grid">
@@ -4519,7 +4552,7 @@ async function saveConfig(id, prefix='cfg-'){
   const pLabel=p=>{const x=p.split('-');return MES[parseInt(x[1],10)-1]+' '+x[0];};
   const pShort=p=>{const x=p.split('-');return MES[parseInt(x[1],10)-1].slice(0,3)+' '+x[0].slice(2);};
 
-  let DATA={}, PERIODOS=[], curP=null, sortState={}, charted=false;
+  let DATA={}, PERIODOS=[], SEL=[], SELSET=new Set(), sortState={}, CH={};
   let FEED_TS=null, FEED_TS_ANY=null;   // última carga del feed / de cualquier origen
   const $=id=>document.getElementById(id);
 
@@ -4556,6 +4589,58 @@ async function saveConfig(id, prefix='cfg-'){
   function consSegTot(p,s){return consSeg(p,s,'O')+consSeg(p,s,'R');}
   function instMonthTot(p,i){return SEG_ORDER.reduce((a,s)=>a+segTot(p,i,s),0);}
 
+  // ── Selección múltiple de meses ─────────────────────────────────────────
+  // SEL = meses tildados, siempre en el orden cronológico de PERIODOS.
+  // Todo lo que se muestra (KPIs, totalizador, matriz y gráficos) suma sobre SEL.
+  function syncSel(){SEL=PERIODOS.filter(p=>SELSET.has(p));}
+  function gS(i,s,t){return SEL.reduce((a,p)=>a+g(p,i,s,t),0);}
+  function consSegS(s,t){return SEL.reduce((a,p)=>a+consSeg(p,s,t),0);}
+  function consSegTotS(s){return consSegS(s,'O')+consSegS(s,'R');}
+  function selLabel(){
+    if(!SEL.length)                 return 'Ningún mes';
+    if(SEL.length===1)              return pLabel(SEL[0]);
+    if(SEL.length===PERIODOS.length)return 'Todos los meses ('+SEL.length+')';
+    if(SEL.length===2)              return pShort(SEL[0])+' · '+pShort(SEL[1]);
+    return SEL.length+' meses · '+pShort(SEL[0])+' → '+pShort(SEL[SEL.length-1]);
+  }
+  function msBuild(){
+    const cont=$('iap-ms-list'); if(!cont)return;
+    if(!PERIODOS.length){cont.innerHTML='<div class="iapms-none">Sin meses cargados</div>';return;}
+    const byYear={};
+    PERIODOS.slice().reverse().forEach(p=>{const y=p.split('-')[0];(byYear[y]=byYear[y]||[]).push(p);});
+    let h='';
+    Object.keys(byYear).sort().reverse().forEach(y=>{
+      h+='<div class="iapms-year"><span>'+y+'</span><button type="button" onclick="IAP.msYear(\''+y+'\')">alternar</button></div>';
+      byYear[y].forEach(p=>{
+        h+='<label class="iapms-opt"><input type="checkbox" value="'+p+'" onchange="IAP.msChange()"'+(SELSET.has(p)?' checked':'')+'>'+pLabel(p)+'</label>';
+      });
+    });
+    cont.innerHTML=h;
+  }
+  function msLabel(){const el=$('iap-ms-lbl'); if(el)el.textContent=selLabel();}
+  function msRefresh(){msLabel();renderAll();renderCharts();}
+  function msChange(){
+    SELSET=new Set(Array.prototype.slice.call($('iap-ms-list').querySelectorAll('input:checked')).map(x=>x.value));
+    syncSel(); msRefresh();
+  }
+  function msSet(list){SELSET=new Set(list);syncSel();msBuild();msRefresh();}
+  function msAll(){msSet(PERIODOS);}
+  function msNone(){msSet([]);}
+  function msLast(n){msSet(PERIODOS.slice(-Math.max(1,n||1)));}
+  function msYear(y){
+    const ofY=PERIODOS.filter(p=>p.indexOf(y+'-')===0);
+    const allOn=ofY.every(p=>SELSET.has(p));
+    ofY.forEach(p=>{allOn?SELSET.delete(p):SELSET.add(p);});
+    syncSel();msBuild();msRefresh();
+  }
+  function msToggle(e){e.stopPropagation();const m=$('iap-ms');if(m)m.classList.toggle('open');}
+  document.addEventListener('click',function(e){
+    const m=$('iap-ms'); if(m&&m.classList.contains('open')&&!m.contains(e.target))m.classList.remove('open');
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'){const m=$('iap-ms');if(m)m.classList.remove('open');}
+  });
+
   async function loadIapos(){
     try{
       const r=await supaFetch('iapos_cobranza?select=periodo,institucion,segmento,tipo,total,origen,actualizado_en&order=periodo.asc&limit=5000');
@@ -4579,8 +4664,10 @@ async function saveConfig(id, prefix='cfg-'){
       renderFeedStatus();
       PERIODOS=Object.keys(DATA).sort();
       if(!PERIODOS.length){$('iap-status').textContent='No hay datos en iapos_cobranza.';return;}
-      curP=PERIODOS[PERIODOS.length-1];
-      $('iap-sel-periodo').innerHTML=PERIODOS.slice().reverse().map(p=>'<option value="'+p+'"'+(p===curP?' selected':'')+'>'+pLabel(p)+'</option>').join('');
+      // Arranca con todos los meses tildados; cada mes nuevo que entre a la
+      // tabla aparece solo en el filtro (la lista se arma desde PERIODOS).
+      SELSET=new Set(PERIODOS); syncSel();
+      msBuild(); msLabel();
       $('iap-sel-scope').innerHTML='<option value="__CONS__">Consolidado</option>'+INST_ORDER.map(i=>'<option value="'+i+'">'+INST_LABEL[i]+'</option>').join('');
       $('iap-status').style.display='none';
       $('iap-body').style.display='block';
@@ -4589,15 +4676,14 @@ async function saveConfig(id, prefix='cfg-'){
       $('iap-status').innerHTML='⚠️ Error al leer Supabase:<br><span style="font-size:12px">'+e.message+'</span>';
     }
   }
-  function onPeriodo(){curP=$('iap-sel-periodo').value;renderAll();}
   function renderAll(){
-    $('iap-tot-title').textContent='Totalizador · '+pLabel(curP);
+    $('iap-tot-title').textContent='Totalizador · '+selLabel();
     renderKpis();renderTotalizador();renderMatriz();
   }
   function renderKpis(){
-    const car=consSegTot(curP,'RO'),inte=consSegTot(curP,'IN'),fc=consSegTot(curP,'FC'),tot=car+inte+fc;
+    const car=consSegTotS('RO'),inte=consSegTotS('IN'),fc=consSegTotS('FC'),tot=car+inte+fc;
     $('iap-kpis').innerHTML=
-      '<div class="kpi-card"><div class="kpi-label">Total IAPOS</div><div class="kpi-value">$'+fmt(tot)+'</div><div class="kpi-sub">'+pLabel(curP)+'</div></div>'+
+      '<div class="kpi-card"><div class="kpi-label">Total IAPOS</div><div class="kpi-value">$'+fmt(tot)+'</div><div class="kpi-sub">'+selLabel()+'</div></div>'+
       '<div class="kpi-card k-green"><div class="kpi-label">Cartera Rosario</div><div class="kpi-value">$'+fmt(car)+'</div><div class="kpi-sub">'+(tot?(car/tot*100).toFixed(1):0)+'% del total</div></div>'+
       '<div class="kpi-card k-blue"><div class="kpi-label">Interior</div><div class="kpi-value">$'+fmt(inte)+'</div><div class="kpi-sub">'+(tot?(inte/tot*100).toFixed(1):0)+'% del total</div></div>'+
       '<div class="kpi-card k-amber"><div class="kpi-label">Fuera de Convenio</div><div class="kpi-value">$'+fmt(fc)+'</div><div class="kpi-sub">'+(tot?(fc/tot*100).toFixed(1):0)+'% del total</div></div>';
@@ -4608,7 +4694,8 @@ async function saveConfig(id, prefix='cfg-'){
 
   function renderTotalizador(){
     const tid='iap-tbl-tot';
-    let rows=INST_ORDER.map(i=>{const v=[g(curP,i,'RO','O'),g(curP,i,'RO','R'),g(curP,i,'IN','O'),g(curP,i,'IN','R'),g(curP,i,'FC','O'),g(curP,i,'FC','R')];const tt=v.reduce((a,b)=>a+b,0);return {label:INST_LABEL[i],sortv:v.concat([tt]),v:v,tt:tt};});
+    if(!SEL.length){$(tid).innerHTML='<tbody><tr><td class="iapms-none">Seleccioná al menos un mes en el filtro.</td></tr></tbody>';return;}
+    let rows=INST_ORDER.map(i=>{const v=[gS(i,'RO','O'),gS(i,'RO','R'),gS(i,'IN','O'),gS(i,'IN','R'),gS(i,'FC','O'),gS(i,'FC','R')];const tt=v.reduce((a,b)=>a+b,0);return {label:INST_LABEL[i],sortv:v.concat([tt]),v:v,tt:tt};});
     rows=applySort(tid,rows);
     const sa=sortState[tid];
     let h='<thead><tr><th rowspan="2" style="vertical-align:bottom">Institución</th>'
@@ -4617,7 +4704,7 @@ async function saveConfig(id, prefix='cfg-'){
     [['Ordinario',0],['Retroactivo',1],['Ordinario',2],['Retroactivo',3],['Ordinario',4],['Retroactivo',5]].forEach((c,idx)=>{const sep=(idx%2===0)?' grp-sep':'';const act=sa&&sa.col===c[1]?' act':'';h+='<th class="r sortable'+sep+act+'" onclick="IAP.toggleSort(\''+tid+'\','+c[1]+')">'+c[0]+' '+arrow(tid,c[1])+'</th>';});
     h+='</tr></thead><tbody>';
     rows.forEach(r=>{h+='<tr><td class="ib">'+r.label+'</td><td class="r grp-sep">'+fmt(r.v[0])+'</td><td class="r">'+fmt(r.v[1])+'</td><td class="r grp-sep">'+fmt(r.v[2])+'</td><td class="r">'+fmt(r.v[3])+'</td><td class="r grp-sep">'+fmt(r.v[4])+'</td><td class="r">'+fmt(r.v[5])+'</td><td class="r grp-sep"><strong>'+fmt(r.tt)+'</strong></td></tr>';});
-    const T=[0,1,2,3,4,5].map(k=>INST_ORDER.reduce((a,i)=>{const vv=[g(curP,i,'RO','O'),g(curP,i,'RO','R'),g(curP,i,'IN','O'),g(curP,i,'IN','R'),g(curP,i,'FC','O'),g(curP,i,'FC','R')];return a+vv[k];},0));
+    const T=[0,1,2,3,4,5].map(k=>INST_ORDER.reduce((a,i)=>{const vv=[gS(i,'RO','O'),gS(i,'RO','R'),gS(i,'IN','O'),gS(i,'IN','R'),gS(i,'FC','O'),gS(i,'FC','R')];return a+vv[k];},0));
     const TT=T.reduce((a,b)=>a+b,0);
     h+='</tbody><tfoot><tr><td>Totales</td><td class="r grp-sep">'+fmt(T[0])+'</td><td class="r">'+fmt(T[1])+'</td><td class="r grp-sep">'+fmt(T[2])+'</td><td class="r">'+fmt(T[3])+'</td><td class="r grp-sep">'+fmt(T[4])+'</td><td class="r">'+fmt(T[5])+'</td><td class="r grp-sep">'+fmt(TT)+'</td></tr></tfoot>';
     $(tid).innerHTML=h;
@@ -4625,12 +4712,13 @@ async function saveConfig(id, prefix='cfg-'){
 
   function renderMatriz(){
     const tid='iap-tbl-matriz';
+    if(!SEL.length){$(tid).innerHTML='<tbody><tr><td class="iapms-none">Seleccioná al menos un mes en el filtro.</td></tr></tbody>';$('iap-matriz-sub').textContent='sin meses seleccionados';return;}
     const scope=($('iap-sel-scope')||{}).value||'__CONS__';
     const isCons=scope==='__CONS__';
     const val=(p,s,t)=>isCons?consSeg(p,s,t):g(p,scope,s,t);
     $('iap-matriz-title').textContent=isCons?'Total IAPOS por mes':INST_LABEL[scope];
-    $('iap-matriz-sub').textContent=isCons?'todas las instituciones':'por mes';
-    let rows=PERIODOS.map(p=>{const v=[val(p,'RO','O'),val(p,'RO','R'),val(p,'IN','O'),val(p,'IN','R'),val(p,'FC','O'),val(p,'FC','R')];const tt=v.reduce((a,b)=>a+b,0);return {p:p,label:pLabel(p),sortv:v.concat([tt,new Date(p+'-01').getTime()]),v:v,tt:tt};});
+    $('iap-matriz-sub').textContent=(isCons?'todas las instituciones':'por institución')+' · '+SEL.length+(SEL.length===1?' mes':' meses');
+    let rows=SEL.map(p=>{const v=[val(p,'RO','O'),val(p,'RO','R'),val(p,'IN','O'),val(p,'IN','R'),val(p,'FC','O'),val(p,'FC','R')];const tt=v.reduce((a,b)=>a+b,0);return {p:p,label:pLabel(p),sortv:v.concat([tt,new Date(p+'-01').getTime()]),v:v,tt:tt};});
     rows=applySort(tid,rows);
     const sa=sortState[tid];
     let h='<thead><tr><th rowspan="2" class="sortable'+(sa&&sa.col===8?' act':'')+'" style="vertical-align:bottom" onclick="IAP.toggleSort(\''+tid+'\',8)">Mes '+arrow(tid,8)+'</th>'
@@ -4639,7 +4727,7 @@ async function saveConfig(id, prefix='cfg-'){
     [['Ordinario',0],['Retroactivo',1],['Ordinario',2],['Retroactivo',3],['Ordinario',4],['Retroactivo',5]].forEach((c,idx)=>{const sep=(idx%2===0)?' grp-sep':'';const act=sa&&sa.col===c[1]?' act':'';h+='<th class="r sortable'+sep+act+'" onclick="IAP.toggleSort(\''+tid+'\','+c[1]+')">'+c[0]+' '+arrow(tid,c[1])+'</th>';});
     h+='</tr></thead><tbody>';
     const tot=[0,0,0,0,0,0];
-    rows.forEach(r=>{r.v.forEach((x,k)=>tot[k]+=x);const hl=r.p===curP?' style="background:#eef4fa"':'';h+='<tr'+hl+'><td class="ib">'+r.label+'</td><td class="r grp-sep">'+fmt(r.v[0])+'</td><td class="r">'+fmt(r.v[1])+'</td><td class="r grp-sep">'+fmt(r.v[2])+'</td><td class="r">'+fmt(r.v[3])+'</td><td class="r grp-sep">'+fmt(r.v[4])+'</td><td class="r">'+fmt(r.v[5])+'</td><td class="r grp-sep"><strong>'+fmt(r.tt)+'</strong></td></tr>';});
+    rows.forEach(r=>{r.v.forEach((x,k)=>tot[k]+=x);const hl=r.p===SEL[SEL.length-1]?' style="background:#eef4fa"':'';h+='<tr'+hl+'><td class="ib">'+r.label+'</td><td class="r grp-sep">'+fmt(r.v[0])+'</td><td class="r">'+fmt(r.v[1])+'</td><td class="r grp-sep">'+fmt(r.v[2])+'</td><td class="r">'+fmt(r.v[3])+'</td><td class="r grp-sep">'+fmt(r.v[4])+'</td><td class="r">'+fmt(r.v[5])+'</td><td class="r grp-sep"><strong>'+fmt(r.tt)+'</strong></td></tr>';});
     const TT=tot.reduce((a,b)=>a+b,0);
     h+='</tbody><tfoot><tr><td>Total período</td><td class="r grp-sep">'+fmt(tot[0])+'</td><td class="r">'+fmt(tot[1])+'</td><td class="r grp-sep">'+fmt(tot[2])+'</td><td class="r">'+fmt(tot[3])+'</td><td class="r grp-sep">'+fmt(tot[4])+'</td><td class="r">'+fmt(tot[5])+'</td><td class="r grp-sep">'+fmt(TT)+'</td></tr></tfoot>';
     $(tid).innerHTML=h;
@@ -4649,20 +4737,27 @@ async function saveConfig(id, prefix='cfg-'){
     plugins:{legend:{labels:{font:{family:'Inter',size:11},usePointStyle:true,boxWidth:8}},tooltip:{callbacks:{label:c=>c.dataset.label+': $'+fmt(c.parsed.y)}}},
     scales:{x:{grid:{display:false},ticks:{font:{family:'Inter',size:10}}},y:{ticks:{font:{family:'Inter',size:10},callback:v=>'$'+fmtShort(v)},grid:{color:'#eef1f4'}}}});
   function renderCharts(){
-    if(charted)return; charted=true;
-    const PG=PERIODOS.slice(0,-1);            // excluye el mes en curso (último)
+    Object.keys(CH).forEach(k=>{if(CH[k]){CH[k].destroy();CH[k]=null;}});
+    // Con todos los meses tildados se sigue excluyendo el mes en curso (último),
+    // porque viene incompleto y ensucia la tendencia. Si se eligen meses puntuales,
+    // se grafican exactamente esos.
+    const todos=SEL.length===PERIODOS.length&&PERIODOS.length>1;
+    const PG=todos?SEL.slice(0,-1):SEL.slice();
+    const note=$('iap-ch-note'); if(note)note.textContent=todos?'· sin el mes en curso':'';
+    if(!PG.length)return;
     const labels=PG.map(pShort);
-    new Chart($('iap-ch-total'),{type:'line',data:{labels:labels,datasets:[{label:'Total IAPOS',data:PG.map(p=>consSegTot(p,'RO')+consSegTot(p,'IN')+consSegTot(p,'FC')),borderColor:COL.navy,backgroundColor:'rgba(13,27,46,.08)',fill:true,tension:.3,pointRadius:2,borderWidth:2}]},options:baseOpts()});
-    new Chart($('iap-ch-seg'),{type:'line',data:{labels:labels,datasets:[
+    CH.total=new Chart($('iap-ch-total'),{type:'line',data:{labels:labels,datasets:[{label:'Total IAPOS',data:PG.map(p=>consSegTot(p,'RO')+consSegTot(p,'IN')+consSegTot(p,'FC')),borderColor:COL.navy,backgroundColor:'rgba(13,27,46,.08)',fill:true,tension:.3,pointRadius:2,borderWidth:2}]},options:baseOpts()});
+    CH.seg=new Chart($('iap-ch-seg'),{type:'line',data:{labels:labels,datasets:[
       {label:'Cartera Rosario',data:PG.map(p=>consSegTot(p,'RO')),borderColor:COL.green,tension:.3,pointRadius:2,borderWidth:2},
       {label:'Interior',data:PG.map(p=>consSegTot(p,'IN')),borderColor:COL.blue,tension:.3,pointRadius:2,borderWidth:2},
       {label:'Fuera de Convenio',data:PG.map(p=>consSegTot(p,'FC')),borderColor:COL.amber,tension:.3,pointRadius:2,borderWidth:2}]},options:baseOpts()});
     const instCol={PARQUE:COL.navy,'NIÑOS':COL.green,ICR:COL.blue,CTC:COL.brown,FUNES:COL.purple};
-    new Chart($('iap-ch-inst'),{type:'line',data:{labels:labels,datasets:INST_ORDER.map(i=>({label:INST_LABEL[i],data:PG.map(p=>instMonthTot(p,i)),borderColor:instCol[i],tension:.3,pointRadius:2,borderWidth:2}))},options:baseOpts()});
+    CH.inst=new Chart($('iap-ch-inst'),{type:'line',data:{labels:labels,datasets:INST_ORDER.map(i=>({label:INST_LABEL[i],data:PG.map(p=>instMonthTot(p,i)),borderColor:instCol[i],tension:.3,pointRadius:2,borderWidth:2}))},options:baseOpts()});
   }
 
   window.loadIapos=loadIapos;
-  window.IAP={onPeriodo:onPeriodo,renderMatriz:renderMatriz,toggleSort:toggleSort};
+  window.IAP={renderMatriz:renderMatriz,toggleSort:toggleSort,
+    msToggle:msToggle,msChange:msChange,msAll:msAll,msNone:msNone,msLast:msLast,msYear:msYear};
 })();
 </script>
 
