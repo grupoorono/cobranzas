@@ -2860,6 +2860,19 @@ function buildDebitosCharts(){
   const MESES_D = D.meses;
   const getDebFins = () => MultiSel.getSelected('deb-fin-ms'); // [] = todos los financiadores
 
+  // Crea un chart destruyendo SIEMPRE el que ya esté colgado del canvas.
+  // buildDebitosCharts() se vuelve a ejecutar cada vez que llegan datos nuevos
+  // (feed del mes en curso, recarga de Supabase) y cada corrida arma un closure
+  // nuevo con sus variables de chart en null: sin este chequeo, Chart.js tira
+  // "Canvas is already in use", el error se lo come el safe() de applyDebFilters
+  // y el gráfico viejo queda dibujado con los importes del filtro anterior.
+  const mkChart = (id, cfg) => {
+    const prev = Chart.getChart(id);
+    if(prev) prev.destroy();
+    const el = document.getElementById(id);
+    return el ? new Chart(el, cfg) : null;
+  };
+
   const chartOpts = {
     responsive:true,
     maintainAspectRatio:false,
@@ -3002,14 +3015,12 @@ function buildDebitosCharts(){
       }
     }
 
-    if(debTotalChart) debTotalChart.destroy();
-    debTotalChart=new Chart(document.getElementById('deb-chart-total'),{
+    debTotalChart=mkChart('deb-chart-total',{
       type:'bar',
       data:{labels:MESES_D,datasets:[{label:'Importe Debitado',data:series.map(s=>s.sinDatos?null:s.deb/1e6),backgroundColor:'rgba(180,83,9,.7)',borderColor:'#b45309',borderWidth:1.5,borderRadius:3}]},
       options:{...chartOpts,scales:{...chartOpts.scales,y:{...chartOpts.scales.y,min:0,ticks:{...chartOpts.scales.y.ticks,callback:v=>v.toLocaleString('es-AR')+' M'}}}}
     });
-    if(debPctChart) debPctChart.destroy();
-    debPctChart=new Chart(document.getElementById('deb-chart-pct'),{
+    debPctChart=mkChart('deb-chart-pct',{
       type:'line',
       data:{labels:MESES_D,datasets:[{label:'% Débitos',data:series.map(s=>s.sinDatos?null:s.pct),borderColor:'#b45309',backgroundColor:'rgba(180,83,9,.1)',borderWidth:2.5,pointRadius:5,pointBackgroundColor:'#b45309',tension:.3,fill:true}]},
       options:{...chartOpts,scales:{...chartOpts.scales,y:{...chartOpts.scales.y,ticks:{...chartOpts.scales.y.ticks,callback:v=>parseFloat(v.toFixed(2))+'%'}}}}
@@ -3201,7 +3212,7 @@ function buildDebitosCharts(){
   // Drill-down chart
   let finChart = null;
   function renderFinChart(finsArr){
-    if(finChart){finChart.destroy(); finChart=null;}
+    finChart=null;
     // finsArr: [] o '__ALL__' = todos; array con 1+ = suma de los elegidos
     const selFins = (!finsArr || finsArr==='__ALL__' || (Array.isArray(finsArr)&&finsArr.length===0))
       ? D.all_fins
@@ -3231,7 +3242,7 @@ function buildDebitosCharts(){
       d[m]={deb, neto, pct: neto>0? parseFloat((deb/neto*100).toFixed(2)) : 0};
     });
     if(!d) return;
-    finChart = new Chart(document.getElementById('deb-chart-fin'),{
+    finChart = mkChart('deb-chart-fin',{
       type:'line',
       data:{labels:MESES_D,datasets:[
         {label:'Importe Debitado (M$)',data:MESES_D.map(m=>d[m]?d[m].deb/1e6:0),
