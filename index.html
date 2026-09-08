@@ -1503,8 +1503,8 @@ function buildMesAnterior(instData, financData){
           const f=r.financiador; if(!f) return;
           if(!agg[f]) agg[f]={name:f,presup:0,cobrado:0,debitado:0};
           agg[f].presup   += r.adeudado||0;
-          agg[f].cobrado  += Math.abs(r.cobrado||0);
-          agg[f].debitado += Math.abs(r.debitado||0);
+          agg[f].cobrado  += r.cobrado||0;
+          agg[f].debitado += r.debitado||0;
         });
       });
       finList2=Object.values(agg).map(d=>({...d,deb_cob:d.cobrado+d.debitado}));
@@ -1649,7 +1649,7 @@ function renderTable(rows,reset){
   tbody.innerHTML='';
   let totAd=0,totCob=0,totDeb=0;
   currentData.forEach(r=>{
-    totAd+=r.adeudado||0;totCob+=Math.abs(r.cobrado||0);totDeb+=Math.abs(r.debitado||0);
+    totAd+=r.adeudado||0;totCob+=(r.cobrado||0);totDeb+=Math.abs(r.debitado||0);
     const est=r.cobrado_bool?'<span class="est-cobrado">✓ Cobrado</span>':'<span class="est-pendiente">Pendiente</span>';
     const tr=document.createElement('tr');
     if(isDeb){
@@ -1964,9 +1964,12 @@ async function loadJunio(){
       const allowedInsts = getInsts();
       if(!allowedInsts.includes(inst)) return;
       const ad   = parseArg(row['Adeudado']);
-      const cob  = Math.abs(parseArg(row['Cobrado']));
-      const deb  = Math.abs(parseArg(row['Debitado']));
-      const net  = Math.abs(parseArg(row['Neto']));
+      // Cobrado y Neto vienen NEGATIVOS de la planilla. Se invierte el signo en vez
+      // de usar Math.abs: así las filas cargadas en POSITIVO (reversos, anulaciones,
+      // ajustes) RESTAN del cobrado en lugar de sumar.
+      const cob  = -parseArg(row['Cobrado']);
+      const deb  = parseArg(row['Debitado']);
+      const net  = -parseArg(row['Neto']);
       const cobBool = row['CobradoBool']===true||row['CobradoBool']==='true'||row['CobradoBool']==1;
       const comp = String(row['Comprobante']||'').trim();
       const fecha= String(row['FechaFact']||'').substring(0,10);
@@ -2222,7 +2225,7 @@ function computeDebitosData(){
         const fin = (r.financiador||'').trim();
         if(!fin) return;
         const deb = Math.abs(r.debitado||0);
-        const cobDeb = deb + Math.abs(r.cobrado||0); // base de respaldo (caso N/P)
+        const cobDeb = deb + (r.cobrado||0); // base de respaldo (caso N/P)
         finsSet.add(fin);
         monthly_inst[m][inst].deb += deb; monthly_inst[m][inst]._cobDeb += cobDeb;
         if(CONS.has(inst)){
@@ -2545,8 +2548,8 @@ function renderCompConFiltro(){
     let presup=0,cobrado=0,debitado=0,neto=0;
     [...(raw.facturas||[]),...(raw.debitos||[])].forEach(r=>{
       if(!finSet.has((r.financiador||'').trim())) return;
-      presup   += Math.abs(r.adeudado||0);
-      cobrado  += Math.abs(r.cobrado||0);
+      presup   += r.adeudado||0;   // con signo: las notas de crédito restan
+      cobrado  += r.cobrado||0;    // con signo: los reversos restan
       debitado += Math.abs(r.debitado||0);
     });
     neto = cobrado + debitado;
@@ -2888,7 +2891,7 @@ function buildDebitosCharts(){
       else { // institución + financiadores: débito desde RAW; denominador = facturado, fallback cobrado+débito (N/P)
         const d = RAW_DATA[m] && RAW_DATA[m][inst];
         let cobDeb = 0;
-        if(d){ d.debitos.forEach(r=>{ if(finSet.has(r.financiador)){ deb+=Math.abs(r.debitado||0); cobDeb+=Math.abs(r.debitado||0)+Math.abs(r.cobrado||0); } }); }
+        if(d){ d.debitos.forEach(r=>{ if(finSet.has(r.financiador)){ deb+=Math.abs(r.debitado||0); cobDeb+=Math.abs(r.debitado||0)+(r.cobrado||0); } }); }
         let fact = 0;
         if(typeof FACTURADO_DATA!=='undefined' && FACTURADO_DATA && FACTURADO_DATA[m]){
           fins.forEach(f=>{ if(FACTURADO_DATA[m][f]) fact += (FACTURADO_DATA[m][f][inst]||0); });
@@ -3057,7 +3060,7 @@ function buildDebitosCharts(){
         mesesR.forEach(m=>{
           instsR.forEach(i=>{
             const recs = (typeof RAW_DATA!=='undefined' && RAW_DATA[m]?.[i]?.debitos) || [];
-            recs.forEach(r=>{ if(r.financiador===fin) totalFact += Math.abs(r.debitado||0)+Math.abs(r.cobrado||0); });
+            recs.forEach(r=>{ if(r.financiador===fin) totalFact += Math.abs(r.debitado||0)+(r.cobrado||0); });
           });
         });
       }
@@ -3218,7 +3221,7 @@ function buildDebitosCharts(){
           if(!finSet.has((r.financiador||'').trim())) return;
           const db = Math.abs(r.debitado||0);
           deb += db;
-          cobDeb += db + Math.abs(r.cobrado||0);
+          cobDeb += db + (r.cobrado||0);
         });
         if(typeof FACTURADO_DATA!=='undefined' && FACTURADO_DATA && FACTURADO_DATA[m]){
           selFins.forEach(f=>{ fact += (FACTURADO_DATA[m][f] && FACTURADO_DATA[m][f][i]) || 0; });
@@ -3390,9 +3393,12 @@ async function loadResponsables(){
       const vacio = (!res || res==='undefined' || res==='null');
       if(vacio) res = SIN_RESP;   // se agrupan como un responsable más para poder detectarlas
       const ad   = parseArg(row['Adeudado']);
-      const cob  = Math.abs(parseArg(row['Cobrado']));
-      const deb  = Math.abs(parseArg(row['Debitado']));
-      const net  = Math.abs(parseArg(row['Neto']));
+      // Cobrado y Neto vienen NEGATIVOS de la planilla. Se invierte el signo en vez
+      // de usar Math.abs: así las filas cargadas en POSITIVO (reversos, anulaciones,
+      // ajustes) RESTAN del cobrado en lugar de sumar.
+      const cob  = -parseArg(row['Cobrado']);
+      const deb  = parseArg(row['Debitado']);
+      const net  = -parseArg(row['Neto']);
       const inst = String(row['Institucion']||'').trim();
       const fin  = String(row['Financiador']||'').trim();
       // No consolidan salvo que sean la institución activa del filtro BI
@@ -3407,7 +3413,7 @@ async function loadResponsables(){
       // restan del presupuesto, igual que en Mes Actual y en el histórico.
       byResp[res].presup   += ad;
       byResp[res].cobrado  += cob;
-      byResp[res].debitado += deb>0?deb:0;
+      byResp[res].debitado += deb;
       byResp[res].neto     += net;
 
       // by financiador
@@ -3580,8 +3586,8 @@ function showRespInstByFin(resp, fin){
         const rResp = String(r.responsable||'').trim() || SIN_RESP;
         if(rResp===resp && r.financiador===fin){
           if(!instData[inst]) instData[inst]={neto:0,presup:0};
-          instData[inst].presup += Math.abs(r.adeudado||0);
-          instData[inst].neto  += Math.abs(r.cobrado||0) + Math.abs(r.debitado||0);
+          instData[inst].presup += r.adeudado||0;
+          instData[inst].neto  += (r.cobrado||0) + Math.abs(r.debitado||0);
         }
       });
     });
@@ -4403,9 +4409,11 @@ async function procesarExcel(){
           return parseFloat(s) || 0;
         };
         const ad  = parseFormula(row[5]);
-        const cob = Math.abs(parseFormula(row[6]));
+        // Cobrado y Neto vienen NEGATIVOS de la planilla: se invierte el signo en vez
+        // de usar Math.abs, para que las filas en POSITIVO (reversos / ajustes) resten.
+        const cob = -parseFormula(row[6]);
         const deb = parseFormula(row[7]);
-        const net = Math.abs(parseFormula(row[8]));
+        const net = -parseFormula(row[8]);
         const comp= String(row[3]||'').trim();
         const fecha= row[4] ? String(row[4]).substring(0,10) : '';
         const resp= String(row[11]||'').trim();
@@ -4415,7 +4423,7 @@ async function procesarExcel(){
         const I = acc(inst);
         I.presup   += ad;  // incluye negativos (ej: "a cuenta") para que coincida con el Apps Script
         I.cobrado  += cob;
-        I.debitado += deb>0?deb:0;
+        I.debitado += deb;
         I.neto     += net;
         I.deb_cob   = I.neto;
 
@@ -4424,7 +4432,7 @@ async function procesarExcel(){
           if(!financData[fin]) financData[fin]={presup:0,cobrado:0,debitado:0,deb_cob:0};
           financData[fin].presup   += ad;
           financData[fin].cobrado  += cob;
-          financData[fin].debitado += deb>0?deb:0;
+          financData[fin].debitado += deb;
           financData[fin].deb_cob  += net;
         }
 
@@ -4433,7 +4441,7 @@ async function procesarExcel(){
           if(!respData2[resp]) respData2[resp]={presup:0,cobrado:0,debitado:0,neto:0};
           respData2[resp].presup   += ad;
           respData2[resp].cobrado  += cob;
-          respData2[resp].debitado += deb>0?deb:0;
+          respData2[resp].debitado += deb;
           respData2[resp].neto     += net;
         }
 
