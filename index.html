@@ -824,7 +824,9 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
               <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Financiador</th>
               <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Comprobante</th>
               <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Fecha</th>
+              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Importe Fact.</th>
               <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Debitado</th>
+              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.8px">% Déb.</th>
             </tr>
           </thead>
           <tbody id="deb-detail-tbody"></tbody>
@@ -3352,11 +3354,13 @@ window.showDebDetail = function(financiador){
 
   rows.sort((a,b)=>Math.abs(b.debitado||0)-Math.abs(a.debitado||0));
 
-  let totDeb=0;
+  let totDeb=0, totImp=0;
   const esc = s => String(s==null?'':s).replace(/"/g,'&quot;');
   tbody.innerHTML = rows.map(r=>{
     const deb = Math.abs(r.debitado||0);
-    totDeb += deb;
+    const imp = Number(r.adeudado)||0;
+    totDeb += deb; totImp += imp;
+    const pct = imp ? deb/Math.abs(imp)*100 : null;
     const fin = r.financiador||'—';
     return `<tr style="border-bottom:1px solid var(--gray-200)">
       <td style="padding:6px 12px;font-size:11px;white-space:nowrap"><span style="background:rgba(14,124,123,.15);color:#1a6b5a;padding:1px 5px;border-radius:3px;font-weight:600;font-size:10px">${r.mes||_mesAntKey()||''}</span></td>
@@ -3364,11 +3368,13 @@ window.showDebDetail = function(financiador){
       <td style="padding:6px 12px;font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(fin)}">${fin}</td>
       <td style="padding:6px 12px;font-size:11px;white-space:nowrap">${r.comprobante||'—'}</td>
       <td style="padding:6px 12px;font-size:11px;color:#6b7280;white-space:nowrap">${r.fecha_fact||'—'}</td>
+      <td style="padding:6px 12px;font-size:11px;text-align:right;font-variant-numeric:tabular-nums">${imp?(imp<0?'-':'')+fmtFull2(imp):'—'}</td>
       <td style="padding:6px 12px;font-size:11px;text-align:right;font-variant-numeric:tabular-nums;color:#b45309;font-weight:600">${deb?fmtFull2(deb):'—'}</td>
+      <td style="padding:6px 12px;font-size:11px;text-align:right;white-space:nowrap">${pct==null?'<span style="color:#9ca3af">—</span>':`<span style="font-weight:700;color:${SEMAFORO(pct)};background:${SEMAFORO_BG(pct)};padding:1px 6px;border-radius:3px">${pct.toFixed(1)}%</span>`}</td>
     </tr>`;
   }).join('');
 
-  footer.innerHTML = `${rows.length} comprobantes | Debitado: $${fmtFull2(totDeb)}`;
+  footer.innerHTML = `${rows.length} comprobantes | Importe facturas: $${fmtFull2(totImp)} | Debitado: $${fmtFull2(totDeb)}${totImp?' ('+(totDeb/Math.abs(totImp)*100).toFixed(1)+'%)':''}`;
   empty.style.display='none';
   wrap.style.display='block';
 };
@@ -4948,19 +4954,27 @@ async function saveConfig(id, prefix='cfg-'){
     rows.sort((a,b)=>
       String(a.financiador||'').localeCompare(String(b.financiador||''))
       || Math.abs(b.debitado||0)-Math.abs(a.debitado||0));
-    const aoa = [['Mes','Institución','Financiador','Comprobante','Fecha','Debitado']];
+    const aoa = [['Mes','Institución','Financiador','Comprobante','Fecha','Importe Factura','Debitado','% Débito']];
+    let tImp=0, tDeb=0;
     rows.forEach(r=>{
+      const imp = Number(r.adeudado)||0, deb = Math.abs(r.debitado||0);
+      tImp += imp; tDeb += deb;
       aoa.push([
         r.mes || '', r.inst || '', r.financiador || '',
-        r.comprobante || '', r.fecha_fact || '', Math.abs(r.debitado||0)
+        r.comprobante || '', r.fecha_fact || '', imp, deb,
+        imp ? deb/Math.abs(imp) : ''
       ]);
     });
     aoa.push([]);
-    aoa.push(['TOTAL','','','','', rows.reduce((s,r)=>s+Math.abs(r.debitado||0),0)]);
+    aoa.push(['TOTAL','','','','', tImp, tDeb, tImp ? tDeb/Math.abs(tImp) : '']);
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     for(let r=1; r<aoa.length; r++){
-      const cell = ws[XLSX.utils.encode_cell({r:r, c:5})];
-      if(cell && cell.t === 'n') cell.z = '#,##0.00';
+      [5,6].forEach(c=>{
+        const cell = ws[XLSX.utils.encode_cell({r:r, c:c})];
+        if(cell && cell.t === 'n') cell.z = '#,##0.00';
+      });
+      const pc = ws[XLSX.utils.encode_cell({r:r, c:7})];
+      if(pc && pc.t === 'n') pc.z = '0.0%';
     }
     ws['!cols'] = autoWidth(aoa);
     return ws;
