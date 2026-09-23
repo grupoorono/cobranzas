@@ -87,6 +87,15 @@ main{padding:20px 28px;max-width:1440px;margin:0 auto}
 .tc-head{background:var(--navy);padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
 .tc-head h3{color:#fff;font-size:12px;font-weight:600;letter-spacing:.3px}
 .tc-head span{color:rgba(255,255,255,.5);font-size:10px}
+.card-tgl{display:flex;gap:6px;margin-left:auto;margin-right:8px}
+.tgl-btn{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:4px;font-size:10px;font-weight:600;padding:3px 8px;cursor:pointer;white-space:nowrap}
+.tgl-btn:hover{background:rgba(255,255,255,.25)}
+.deb-exp{grid-column:1/-1}
+.deb-exp .deb-scroll{max-height:none!important}
+.deb-col{align-self:start}
+.deb-col > :not(.tc-head){display:none!important}
+.deb-th{padding:7px 12px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px;cursor:pointer;user-select:none;white-space:nowrap}
+.deb-th:hover{color:#fff}
 table{width:100%;border-collapse:collapse}
 thead tr{background:var(--navy)}
 thead th{padding:8px 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.75);text-align:left;border-right:1px solid rgba(255,255,255,.08)}
@@ -799,11 +808,11 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
   <!-- 3. Ranking con semáforo -->
   <div class="sec-title" style="margin-top:20px">3. Ranking de Financiadores por % Débito</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-    <div class="tc">
+    <div class="tc" id="deb-card-ranking">
       <div class="tc-head"><h3 id="deb-ranking-title">Financiadores</h3><span>semáforo por % débito</span></div>
-      <div style="padding:4px 0;max-height:480px;overflow-y:auto" id="deb-ranking"></div>
+      <div class="deb-scroll" style="padding:4px 0;max-height:480px;overflow-y:auto" id="deb-ranking"></div>
     </div>
-    <div class="chart-card">
+    <div class="chart-card" id="deb-card-detalle">
       <div class="tc-head" style="display:flex;align-items:center;justify-content:space-between">
         <h3 id="deb-detail-title">Detalle de comprobantes</h3>
         <div style="display:flex;align-items:center;gap:10px">
@@ -815,20 +824,9 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
         <div style="font-size:28px;margin-bottom:8px">👆</div>
         <div style="font-size:13px">Hacé click en un financiador del ranking para ver sus comprobantes debitados</div>
       </div>
-      <div id="deb-detail-wrap" style="display:none;max-height:460px;overflow-y:auto">
+      <div id="deb-detail-wrap" class="deb-scroll" style="display:none;max-height:460px;overflow-y:auto">
         <table id="deb-detail-table" data-exp-btn="1" style="width:100%;border-collapse:collapse;font-size:12px">
-          <thead style="position:sticky;top:0;background:var(--navy);z-index:5">
-            <tr>
-              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Mes</th>
-              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Institución</th>
-              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Financiador</th>
-              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Comprobante</th>
-              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Fecha</th>
-              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Importe Fact.</th>
-              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Debitado</th>
-              <th style="padding:7px 12px;color:rgba(255,255,255,.8);text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.8px">% Déb.</th>
-            </tr>
-          </thead>
+          <thead id="deb-detail-thead" style="position:sticky;top:0;background:var(--navy);z-index:5"></thead>
           <tbody id="deb-detail-tbody"></tbody>
         </table>
         <div id="deb-detail-footer" style="padding:8px 12px;background:#f8f9fa;border-top:1px solid var(--gray-200);font-size:11px;color:var(--gray-700);font-weight:600"></div>
@@ -838,7 +836,7 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
 
   <!-- 4. Mapa de calor -->
   <div class="sec-title" style="margin-top:20px">4. Mapa de Calor — % Débito por Financiador e Institución</div>
-  <div class="tc">
+  <div class="tc" id="deb-card-heatmap">
     <div class="tc-head"><h3>Todos los Financiadores × Institución</h3><span>% débito — click encabezado para ordenar</span></div>
     <div style="padding:12px 16px" id="deb-heatmap"></div>
   </div>
@@ -1658,7 +1656,7 @@ function renderTable(rows,reset){
       tr.innerHTML=`
         <td style="max-width:185px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.financiador}">${r.financiador}</td>
         <td style="white-space:nowrap">${r.comprobante}</td>
-        <td style="white-space:nowrap;color:var(--gray-500)">${r.fecha_fact||'—'}</td>
+        <td style="white-space:nowrap;color:var(--gray-500)">${fmtFechaAR(r.fecha_fact)||'—'}</td>
         <td class="r">${r.adeudado?fmtN(r.adeudado):'—'}</td>
         <td class="r mv-debitado">${r.debitado?fmtN(Math.abs(r.debitado)):'—'}</td>
         <td>${est}</td>`;
@@ -1666,7 +1664,7 @@ function renderTable(rows,reset){
       tr.innerHTML=`
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.financiador}">${r.financiador}</td>
         <td style="white-space:nowrap">${r.comprobante}</td>
-        <td style="white-space:nowrap;color:var(--gray-500)">${r.fecha_fact||'—'}</td>
+        <td style="white-space:nowrap;color:var(--gray-500)">${fmtFechaAR(r.fecha_fact)||'—'}</td>
         <td class="r">${r.adeudado?fmtN(r.adeudado):'—'}</td>
         <td>${est}</td>`;
     }
@@ -1974,7 +1972,7 @@ async function loadJunio(){
       const net  = -parseArg(row['Neto']);
       const cobBool = row['CobradoBool']===true||row['CobradoBool']==='true'||row['CobradoBool']==1;
       const comp = String(row['Comprobante']||'').trim();
-      const fecha= String(row['FechaFact']||'').substring(0,10);
+      const fecha= fmtFechaAR(row['FechaFact']);
       const resp2= String(row['Responsable']||'').trim();
 
       if(!inst||!fin) return;
@@ -2831,6 +2829,34 @@ function renderCompConFiltro(){
 
 <script>
 // == DEBITOS PAGE ==
+// Normaliza fechas de factura a dd/mm/aaaa. Acepta: serial de Excel (45993), Date,
+// ISO (2026-08-03...), texto de Date ("Mon Aug 03 2026 ...") y el texto truncado
+// sin año ("Mon Aug 03"), en cuyo caso toma el año más reciente que no quede en el futuro.
+function fmtFechaAR(v){
+  if(v==null || v==='') return '';
+  const p2 = n => String(n).padStart(2,'0');
+  const out = (d,m,y) => p2(d)+'/'+p2(m)+'/'+y;
+  if(v instanceof Date) return isNaN(v) ? '' : out(v.getDate(), v.getMonth()+1, v.getFullYear());
+  const t = String(v).trim();
+  if(!t) return '';
+  let m;
+  if(/^\d{4,6}(\.\d+)?$/.test(t)){                       // serial Excel
+    const d = new Date(Math.round((parseFloat(t)-25569)*86400000));
+    return out(d.getUTCDate(), d.getUTCMonth()+1, d.getUTCFullYear());
+  }
+  if((m = t.match(/^(\d{4})-(\d{2})-(\d{2})/))) return out(m[3], m[2], m[1]);
+  if((m = t.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/))) return out(m[1], m[2], m[3].length===2?'20'+m[3]:m[3]);
+  const MES = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  if((m = t.match(/^(?:[A-Za-z]{3}\s+)?([A-Za-z]{3})\s+(\d{1,2})(?:\s+(\d{4}))?/)) && MES[m[1].toLowerCase()]){
+    const mm = MES[m[1].toLowerCase()], dd = +m[2];
+    let yy = m[3] ? +m[3] : null;
+    if(!yy){ const hoy = new Date(); yy = hoy.getFullYear(); if(new Date(yy, mm-1, dd) > hoy) yy--; }
+    return out(dd, mm, yy);
+  }
+  const d = new Date(t);
+  return isNaN(d) ? t : out(d.getDate(), d.getMonth()+1, d.getFullYear());
+}
+window.fmtFechaAR = fmtFechaAR;
 const fmtFull2=n=>Math.abs(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const DEB_COLORS = ['#0d1b2e','#1a6b5a','#2563a8','#b45309','#7c3aed','#0891b2'];
 const SEMAFORO = (pct) => pct >= 4 ? '#dc2626' : pct >= 2 ? '#d97706' : '#16a34a';
@@ -3178,7 +3204,7 @@ function buildDebitosCharts(){
     const arrow = (col) => hmSortCol===col ? (hmSortAsc?' &uarr;':' &darr;') : ' &#8693;';
 
     hmWrap.innerHTML = `
-      <div style="max-height:520px;overflow-y:auto;overflow-x:auto">
+      <div class="deb-scroll" style="max-height:520px;overflow-y:auto;overflow-x:auto">
       <table style="border-collapse:collapse;width:100%;font-size:12px;min-width:600px">
         <thead style="position:sticky;top:0;z-index:5;background:#fff">
           <tr>
@@ -3327,8 +3353,22 @@ window.getDebDetalleRows = function(finArr){
   return {rows, mesFilter, instFilter};
 };
 
+// Orden de la tabla de detalle (click en encabezado). Default: mayor débito primero.
+window._debDetSort = {key:'deb', asc:false};
+window.debDetSort = function(key){
+  const st = window._debDetSort;
+  if(st.key===key) st.asc = !st.asc;
+  else { st.key = key; st.asc = (key==='mes'||key==='inst'||key==='fin'||key==='comp'||key==='fecha'); }
+  showDebDetail(window._debDetLastArg);
+};
+function _debFechaKey(v){
+  const m = fmtFechaAR(v).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? Date.UTC(+m[3], +m[2]-1, +m[1]) : -Infinity;
+}
+
 // Detail panel for debitos ranking
 window.showDebDetail = function(financiador){
+  window._debDetLastArg = financiador;
   const empty = document.getElementById('deb-detail-empty');
   const wrap = document.getElementById('deb-detail-wrap');
   const tbody = document.getElementById('deb-detail-tbody');
@@ -3352,7 +3392,34 @@ window.showDebDetail = function(financiador){
     return;
   }
 
-  rows.sort((a,b)=>Math.abs(b.debitado||0)-Math.abs(a.debitado||0));
+  const mesOrd = (typeof RAW_DATA!=='undefined' && RAW_DATA) ? Object.keys(RAW_DATA) : [];
+  const impOf = r => Number(r.adeudado)||0;
+  const debOf = r => Math.abs(r.debitado||0);
+  const pctOf2 = r => { const i=impOf(r); return i ? debOf(r)/Math.abs(i)*100 : -1; };
+  const KEYS = {
+    mes:   r => mesOrd.indexOf(r.mes),
+    inst:  r => String(r.inst||''),
+    fin:   r => String(r.financiador||''),
+    comp:  r => String(r.comprobante||''),
+    fecha: r => _debFechaKey(r.fecha_fact),
+    imp:   impOf,
+    deb:   debOf,
+    pct:   pctOf2
+  };
+  const st = window._debDetSort;
+  const kf = KEYS[st.key] || KEYS.deb;
+  rows.sort((a,b)=>{
+    const av=kf(a), bv=kf(b);
+    const c = (typeof av==='string') ? av.localeCompare(bv,'es',{numeric:true}) : av-bv;
+    return (st.asc ? c : -c) || (debOf(b)-debOf(a));
+  });
+
+  const COLS = [['mes','Mes','left'],['inst','Institución','left'],['fin','Financiador','left'],['comp','Comprobante','left'],
+                ['fecha','Fecha','left'],['imp','Importe Fact.','right'],['deb','Debitado','right'],['pct','% Déb.','right']];
+  document.getElementById('deb-detail-thead').innerHTML = '<tr>' + COLS.map(([k,l,al])=>{
+    const arr = st.key===k ? (st.asc?' ↑':' ↓') : ' ⇅';
+    return `<th class="deb-th" style="text-align:${al}" onclick="debDetSort('${k}')">${l}<span style="opacity:${st.key===k?1:.4}">${arr}</span></th>`;
+  }).join('') + '</tr>';
 
   let totDeb=0, totImp=0;
   const esc = s => String(s==null?'':s).replace(/"/g,'&quot;');
@@ -3367,7 +3434,7 @@ window.showDebDetail = function(financiador){
       <td style="padding:6px 12px;font-size:11px"><span style="background:rgba(14,124,123,.15);color:#1a6b5a;padding:1px 6px;border-radius:3px;font-weight:600">${r.inst}</span></td>
       <td style="padding:6px 12px;font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(fin)}">${fin}</td>
       <td style="padding:6px 12px;font-size:11px;white-space:nowrap">${r.comprobante||'—'}</td>
-      <td style="padding:6px 12px;font-size:11px;color:#6b7280;white-space:nowrap">${r.fecha_fact||'—'}</td>
+      <td style="padding:6px 12px;font-size:11px;color:#6b7280;white-space:nowrap">${fmtFechaAR(r.fecha_fact)||'—'}</td>
       <td style="padding:6px 12px;font-size:11px;text-align:right;font-variant-numeric:tabular-nums">${imp?(imp<0?'-':'')+fmtFull2(imp):'—'}</td>
       <td style="padding:6px 12px;font-size:11px;text-align:right;font-variant-numeric:tabular-nums;color:#b45309;font-weight:600">${deb?fmtFull2(deb):'—'}</td>
       <td style="padding:6px 12px;font-size:11px;text-align:right;white-space:nowrap">${pct==null?'<span style="color:#9ca3af">—</span>':`<span style="font-weight:700;color:${SEMAFORO(pct)};background:${SEMAFORO_BG(pct)};padding:1px 6px;border-radius:3px">${pct.toFixed(1)}%</span>`}</td>
@@ -3378,6 +3445,38 @@ window.showDebDetail = function(financiador){
   empty.style.display='none';
   wrap.style.display='block';
 };
+
+// Botones Expandir / Contraer en las tablas de la pestaña Débitos
+function initDebToggles(){
+  ['deb-card-ranking','deb-card-detalle','deb-card-heatmap'].forEach(id=>{
+    const card = document.getElementById(id);
+    if(!card || card.querySelector('.card-tgl')) return;
+    const head = card.querySelector('.tc-head');
+    if(!head) return;
+    const g = document.createElement('div');
+    g.className = 'card-tgl no-print';
+    const bExp = document.createElement('button');
+    const bCol = document.createElement('button');
+    bExp.className = bCol.className = 'tgl-btn';
+    const paint = ()=>{
+      const exp = card.classList.contains('deb-exp'), col = card.classList.contains('deb-col');
+      bExp.textContent = exp ? '⤡ Reducir' : '⤢ Expandir';
+      bExp.title = exp ? 'Volver al tamaño normal' : 'Ver la tabla completa, a todo el ancho';
+      bCol.textContent = col ? '▸ Mostrar' : '▾ Ocultar';
+      bCol.title = col ? 'Mostrar la tabla' : 'Ocultar la tabla';
+      bExp.style.display = col ? 'none' : '';
+    };
+    bExp.onclick = e=>{ e.stopPropagation(); card.classList.toggle('deb-exp'); paint(); };
+    bCol.onclick = e=>{ e.stopPropagation(); card.classList.toggle('deb-col'); if(card.classList.contains('deb-col')) card.classList.remove('deb-exp'); paint(); };
+    g.appendChild(bExp); g.appendChild(bCol);
+    const inner = head.querySelector(':scope > div');
+    if(inner){ g.style.margin='0'; inner.insertBefore(g, inner.firstChild); }
+    else head.insertBefore(g, head.querySelector('.xls-btn.mini'));
+    paint();
+  });
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initDebToggles);
+else initDebToggles();
 
 // == RESPONSABLES PAGE ==
 let respData = {};
@@ -3423,7 +3522,7 @@ async function loadResponsables(){
       if(ad===0 && cob===0 && deb===0 && net===0) return;
 
       if(vacio) sinResp.push({inst, fin, comp:String(row['Comprobante']||'').trim(),
-                              fecha:String(row['FechaFact']||'').substring(0,10), ad});
+                              fecha:fmtFechaAR(row['FechaFact']), ad});
 
       if(!byResp[res]) byResp[res] = {presup:0,cobrado:0,debitado:0,neto:0,fins:{},insts:{}};
       // presup suma CON SIGNO: los adeudados negativos (anticipos / notas a cuenta)
@@ -4432,7 +4531,7 @@ async function procesarExcel(){
         const deb = parseFormula(row[7]);
         const net = -parseFormula(row[8]);
         const comp= String(row[3]||'').trim();
-        const fecha= row[4] ? String(row[4]).substring(0,10) : '';
+        const fecha= row[4] ? fmtFechaAR(row[4]) : '';
         const resp= String(row[11]||'').trim();
 
         if(ad===0 && cob===0 && (deb===0||isNaN(deb)) && net===0) return;
@@ -4961,7 +5060,7 @@ async function saveConfig(id, prefix='cfg-'){
       tImp += imp; tDeb += deb;
       aoa.push([
         r.mes || '', r.inst || '', r.financiador || '',
-        r.comprobante || '', r.fecha_fact || '', imp, deb,
+        r.comprobante || '', fmtFechaAR(r.fecha_fact), imp, deb,
         imp ? deb/Math.abs(imp) : ''
       ]);
     });
