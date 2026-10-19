@@ -544,7 +544,7 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
     <table style="width:100%;border-collapse:collapse">
       <thead style="position:sticky;top:0;z-index:5"><tr>
         <th style="background:var(--navy);padding:8px 12px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Financiador</th>
-        <th class="r" title="Participación del financiador sobre el total presupuestado" style="background:var(--navy);padding:8px 12px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px">% Part.</th>
+        <th class="r" title="Participación del financiador sobre el total (Cobrado + Débitos)" style="background:var(--navy);padding:8px 12px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px">% Part. Cobranza</th>
         <th class="r" style="background:var(--navy);padding:8px 12px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px">Presupuestado</th>
         <th class="r" style="background:var(--navy);padding:8px 12px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px">Cobrado + Débitos</th>
         <th class="r" title="(Cobrado + Débitos) / Presupuestado" style="background:var(--navy);padding:8px 12px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px">% Cobrado</th>
@@ -632,7 +632,7 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
         <div style="max-height:580px;overflow-y:auto">
           <table id="junio-fin-table" style="width:100%;border-collapse:collapse"><thead style="position:sticky;top:0;z-index:5"><tr>
             <th onclick="sortJunioFin(0)" style="cursor:pointer;background:var(--navy);padding:8px 13px;color:rgba(255,255,255,.8);text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap">Financiador ⇅</th>
-            <th class="r" onclick="sortJunioFin(1)" title="Participación del financiador sobre el total presupuestado" style="cursor:pointer;background:var(--navy);padding:8px 13px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap">% Part. ⇅</th>
+            <th class="r" onclick="sortJunioFin(1)" title="Participación del financiador sobre el total (Cobrado + Débitos)" style="cursor:pointer;background:var(--navy);padding:8px 13px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap">% Part. Cobranza ⇅</th>
             <th class="r" onclick="sortJunioFin(2)" style="cursor:pointer;background:var(--navy);padding:8px 13px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap">Presupuestado ⇅</th>
             <th class="r" onclick="sortJunioFin(3)" style="cursor:pointer;background:var(--navy);padding:8px 13px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap">Cobrado + Débitos ⇅</th>
             <th class="r" onclick="sortJunioFin(4)" title="(Cobrado + Débitos) / Presupuestado" style="cursor:pointer;background:var(--navy);padding:8px 13px;color:rgba(255,255,255,.8);font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap">% Cobrado ⇅</th>
@@ -1516,6 +1516,8 @@ function buildMesAnterior(instData, financData){
     }
     // Total presupuestado de financiadores (base del % de participacion)
     const totPresupFin = finList2.reduce((s,d)=>s+(d.presup||0),0);
+    // Total cobrado (en $) de financiadores (base del % de participacion en la cobranza)
+    const totCobFin = finList2.reduce((s,d)=>s+(d.deb_cob||((d.cobrado||0)+(d.debitado||0))),0);
     finList2.forEach(d=>{
       const deb_cob=d.deb_cob||(d.cobrado+d.debitado);
       const pd=pctOf(d.debitado,d.cobrado);
@@ -1530,7 +1532,7 @@ function buildMesAnterior(instData, financData){
       }
       tr.innerHTML=`
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.name}">${d.name}</td>
-        <td class="r">${pctPartBadge(pctPart(d.presup, totPresupFin))}</td>
+        <td class="r">${pctPartBadge(pctPart(deb_cob, totCobFin))}</td>
         <td class="r">${fmtFull(d.presup)}</td>
         <td class="r cell-green">${fmtFull(deb_cob)}</td>
         <td class="r">${pctCobBadge(pctCob(deb_cob, d.presup))}</td>
@@ -2098,7 +2100,8 @@ async function loadJunio(){
     // % de participacion sobre el total presupuestado del mes
     {
       const totPresupFinJ = window._junioFinData.reduce((s,d)=>s+(d.presup||0),0);
-      window._junioFinData.forEach(d=>{ d.part = pctPart(d.presup, totPresupFinJ); });
+      const totNetoFinJ = window._junioFinData.reduce((s,d)=>s+(d.neto||0),0);
+      window._junioFinData.forEach(d=>{ d.part = pctPart(d.neto, totNetoFinJ); });
     }
     window._junioFinSort = {col:2, asc:false};
     document.getElementById('junio-fin-count').textContent = `(${window._junioFinData.length} financiadores)`;
