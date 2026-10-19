@@ -2029,11 +2029,11 @@ async function loadJunio(){
     // KPIs
     const kpiWrap = document.getElementById('junio-kpis');
     kpiWrap.innerHTML=`
-      <div class="kpi-card"><div class="kpi-label">Presupuestado</div><div class="kpi-value">${fmt(totalPresup)}</div><div class="kpi-sub">${liveMesNombre()} ${ANIO_PANEL}</div></div>
-      <div class="kpi-card k-green"><div class="kpi-label">Cobrado + Débitos</div><div class="kpi-value">${fmt(totalNeto)}</div><div class="kpi-sub">cobrado + debitado del período</div></div>
+      <div class="kpi-card"><div class="kpi-label">Presupuestado</div><div class="kpi-value">$${fmt(totalPresup)}</div><div class="kpi-sub">${liveMesNombre()} ${ANIO_PANEL}</div></div>
+      <div class="kpi-card k-green"><div class="kpi-label">Cobrado + Débitos</div><div class="kpi-value">$${fmt(totalNeto)}</div><div class="kpi-sub">cobrado + debitado del período</div></div>
       <div class="kpi-pct"><div class="kpi-label">% del Presupuesto</div><div class="kpi-pct-value">${pctNeto.toFixed(2)}%</div><div class="kpi-sub">cobrado + débitos</div></div>
-      <div class="kpi-card k-blue"><div class="kpi-label">Cobrado (en $)</div><div class="kpi-value">${fmt(totalCobrado)}</div><span class="kpi-badge kb-blue">${(totalPresup?totalCobrado/totalPresup*100:0).toFixed(2)}% del ppto (sin débitos)</span></div>
-      <div class="kpi-card k-amber"><div class="kpi-label">Importe Debitado</div><div class="kpi-value">${fmt(totalDebitado)}</div><span class="kpi-badge kb-amber">${pctDeb.toFixed(2)}% sobre cobrado+deb</span></div>`;
+      <div class="kpi-card k-blue"><div class="kpi-label">Cobrado (en $)</div><div class="kpi-value">$${fmt(totalCobrado)}</div><span class="kpi-badge kb-blue">${(totalPresup?totalCobrado/totalPresup*100:0).toFixed(2)}% del ppto (sin débitos)</span></div>
+      <div class="kpi-card k-amber"><div class="kpi-label">Importe Debitado</div><div class="kpi-value">$${fmt(totalDebitado)}</div><span class="kpi-badge kb-amber">${pctDeb.toFixed(2)}% sobre cobrado+deb</span></div>`;
 
     // Inst table
     const instOrder=getInsts();
@@ -2973,16 +2973,16 @@ function buildDebitosCharts(){
     if(mes){
       const sm = series.find(s=>s.m===mes)||{deb:0,pct:0};
       kpiHtml=`
-        <div class="kpi-card k-amber"><div class="kpi-label">Debitado ${mes}</div><div class="kpi-value">${fmt(sm.deb)}</div><span class="kpi-badge kb-amber">${sm.pct}% sobre cobrado+deb</span></div>
-        <div class="kpi-card"><div class="kpi-label">Total período (filtro)</div><div class="kpi-value">${fmt(totalDeb)}</div><span class="kpi-badge ba">${avgPct}% prom.</span></div>
+        <div class="kpi-card k-amber"><div class="kpi-label">Debitado ${mes}</div><div class="kpi-value">$${fmt(sm.deb)}</div><span class="kpi-badge kb-amber">${sm.pct}% sobre cobrado+deb</span></div>
+        <div class="kpi-card"><div class="kpi-label">Total período (filtro)</div><div class="kpi-value">$${fmt(totalDeb)}</div><span class="kpi-badge ba">${avgPct}% prom.</span></div>
         <div class="kpi-card r"><div class="kpi-label">Mes con más débitos</div><div class="kpi-value" style="font-size:22px">${maxM.m}</div><div class="kpi-sub">${fmt(maxM.deb)} — ${maxM.pct}%</div></div>
         <div class="kpi-card g"><div class="kpi-label">Filtro activo</div><div class="kpi-value" style="font-size:15px">${inst||'Todas'}</div><div class="kpi-sub">Financ.: ${finLbl}</div></div>`;
     } else {
       const lastMes=MESES_D[MESES_D.length-1];
       const lt=series.find(s=>s.m===lastMes)||{deb:0,pct:0};
       kpiHtml=`
-        <div class="kpi-card k-amber"><div class="kpi-label">Debitado ${lastMes}</div><div class="kpi-value">${fmt(lt.deb)}</div><span class="kpi-badge kb-amber">${lt.pct}% sobre cobrado+deb</span></div>
-        <div class="kpi-card"><div class="kpi-label">Promedio Mensual</div><div class="kpi-value">${fmt(avgDeb)}</div><span class="kpi-badge ba">${avgPct}% promedio</span></div>
+        <div class="kpi-card k-amber"><div class="kpi-label">Debitado ${lastMes}</div><div class="kpi-value">$${fmt(lt.deb)}</div><span class="kpi-badge kb-amber">${lt.pct}% sobre cobrado+deb</span></div>
+        <div class="kpi-card"><div class="kpi-label">Promedio Mensual</div><div class="kpi-value">$${fmt(avgDeb)}</div><span class="kpi-badge ba">${avgPct}% promedio</span></div>
         <div class="kpi-card r"><div class="kpi-label">Mes con más débitos</div><div class="kpi-value" style="font-size:22px">${maxM.m}</div><div class="kpi-sub">${fmt(maxM.deb)} — ${maxM.pct}%</div></div>
         <div class="kpi-card g"><div class="kpi-label">Mes con menos débitos</div><div class="kpi-value" style="font-size:22px">${minM.m}</div><div class="kpi-sub">${fmt(minM.deb)} — ${minM.pct}%</div></div>`;
     }
@@ -3042,7 +3042,7 @@ function buildDebitosCharts(){
           <div class="kpi-card k-blue" style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px">
             <div>
               <div class="kpi-label">Total Facturado</div>
-              <div class="kpi-value">${fmt(totFact)}</div>
+              <div class="kpi-value">$${fmt(totFact)}</div>
               <div class="kpi-sub">suma de adeudado (todas las filas) · ${scopeLabel}</div>
             </div>
             <div style="text-align:right">
@@ -3568,10 +3568,10 @@ async function loadResponsables(){
     const totalNC     = totalPresup - totalNeto;
     document.getElementById('resp-kpis').innerHTML=`
       <div class="kpi-card"><div class="kpi-label">Responsables activos</div><div class="kpi-value" style="font-size:36px">${Object.keys(byResp).filter(k=>k!==SIN_RESP).length}</div><div class="kpi-sub">${liveMesNombre()} ${ANIO_PANEL}</div></div>
-      ${sinResp.length?`<div class="kpi-card k-amber"><div class="kpi-label">Sin responsable</div><div class="kpi-value">${fmt(byResp[SIN_RESP]?byResp[SIN_RESP].presup:0)}</div><span class="kpi-badge kb-amber">${sinResp.length} ${sinResp.length===1?'factura':'facturas'} a asignar</span></div>`:''}
-      <div class="kpi-card k-green"><div class="kpi-label">Total Cobrado + Débitos</div><div class="kpi-value">${fmt(totalNeto)}</div><span class="kpi-badge ${totalNeto>=totalPresup?'kb-green':'kb-red'}">${totalPresup?(totalNeto/totalPresup*100).toFixed(1)+'%':'—'} del presupuesto</span></div>
-      <div class="kpi-card k-amber"><div class="kpi-label">Total Debitado</div><div class="kpi-value">${fmt(totalDeb)}</div><span class="kpi-badge kb-amber">${totalNeto?(totalDeb/totalNeto*100).toFixed(1)+'%':'—'} sobre cobrado</span></div>
-      <div class="kpi-card ${totalNC>0?'k-blue':'k-green'}"><div class="kpi-label">Ppto No Cobrado</div><div class="kpi-value">${fmt(totalNC)}</div><div class="kpi-sub">${totalNC>0?'pendiente de cobro':'superó el presupuesto'}</div></div>`;
+      ${sinResp.length?`<div class="kpi-card k-amber"><div class="kpi-label">Sin responsable</div><div class="kpi-value">$${fmt(byResp[SIN_RESP]?byResp[SIN_RESP].presup:0)}</div><span class="kpi-badge kb-amber">${sinResp.length} ${sinResp.length===1?'factura':'facturas'} a asignar</span></div>`:''}
+      <div class="kpi-card k-green"><div class="kpi-label">Total Cobrado + Débitos</div><div class="kpi-value">$${fmt(totalNeto)}</div><span class="kpi-badge ${totalNeto>=totalPresup?'kb-green':'kb-red'}">${totalPresup?(totalNeto/totalPresup*100).toFixed(1)+'%':'—'} del presupuesto</span></div>
+      <div class="kpi-card k-amber"><div class="kpi-label">Total Debitado</div><div class="kpi-value">$${fmt(totalDeb)}</div><span class="kpi-badge kb-amber">${totalNeto?(totalDeb/totalNeto*100).toFixed(1)+'%':'—'} sobre cobrado</span></div>
+      <div class="kpi-card ${totalNC>0?'k-blue':'k-green'}"><div class="kpi-label">Ppto No Cobrado</div><div class="kpi-value">$${fmt(totalNC)}</div><div class="kpi-sub">${totalNC>0?'pendiente de cobro':'superó el presupuesto'}</div></div>`;
 
     // Table
     const tbody = document.getElementById('resp-tbody');
