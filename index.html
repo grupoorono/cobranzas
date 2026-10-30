@@ -1102,7 +1102,7 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
   #page-aging .ag-chip.live{color:#15803d;background:#dcfce7;border-color:#bbf7d0}
   #page-aging .ag-chip.fixed{color:#1e40af;background:#dbeafe;border-color:#bfdbfe}
   #page-aging .ag-status{padding:46px 20px;text-align:center;color:var(--gray-500);font-size:14px;line-height:1.6}
-  #page-aging .kpi-row{grid-template-columns:repeat(5,1fr)}
+  #page-aging .kpi-row{grid-template-columns:repeat(3,1fr)}
   #page-aging .kpi-value{font-size:22px}
   #page-aging .ag-note{font-size:11px;color:var(--gray-500);margin-top:6px}
   #page-aging .ag-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:14px}
@@ -1167,6 +1167,7 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
             <option value="noppto">Solo fuera del presupuesto</option>
           </select>
         </div>
+        <span id="ag-corte-chip" class="ag-chip" style="font-size:13px;font-weight:700;color:#7c2d12;background:#fff7ed;border-color:#fed7aa"></span>
         <span id="ag-ppto-chip" class="ag-chip"></span>
         <button class="ag-btn ghost" style="margin-left:auto" onclick="AG.exportDetalle()">⬇ Descargar todo el detalle</button>
       </div>
@@ -5554,10 +5555,17 @@ async function procesarAging(){
     }catch(e){}
     const resumen = {};
     facturas.forEach(f=>{ resumen[f.i]=(resumen[f.i]||0)+f.p; });
+    // Presupuesto original del mes al momento de la carga: { inst: { responsable: adeudado } }
+    let pptoOrig = null;
+    if(live){
+      pptoOrig = {};
+      live.forEach(x=>{ const i=String(x['Institucion']||'').trim(), r=String(x['Responsable']||'').trim();
+        if(!i) return; (pptoOrig[i]=pptoOrig[i]||{}); pptoOrig[i][r]=Math.round(((pptoOrig[i][r]||0)+agNum(x['Adeudado']))*100)/100; });
+    }
     const registro = {
       mes: nombre, tipo: 'aging', created_at: new Date().toISOString(), activo: true,
       datos_raw: JSON.stringify({ corte, dias_vto: AG_DIAS_VTO, mes: mesLbl, archivo: file.name,
-                                  ppto_disponible: !!live, facturas }),
+                                  ppto_disponible: !!live, ppto_original: pptoOrig, facturas }),
       datos_inst: JSON.stringify(Object.entries(resumen).map(([name,pend])=>({name, pendiente:Math.round(pend)}))),
       datos_financ: '[]', datos_resp: '[]', datos_facturado: '{}'
     };
@@ -5697,6 +5705,25 @@ window.AG = (function(){
     render();
   }
 
+  // Presupuesto original del mes (= Presupuestado de Mes Actual), con los mismos filtros.
+  // Mes en curso: feed en vivo. Mes cerrado: Excel archivado de ese mes (RAW_DATA).
+  function pptoOriginal(){
+    const insts = getInsts(), ok = (i,r)=> insts.includes(i) && (!S.resp || r===S.resp);
+    if(S.pptoFuente==='vivo' && Array.isArray(window._liveRowsAll)){
+      let t=0; window._liveRowsAll.forEach(x=>{ const i=String(x['Institucion']||'').trim(); if(ok(i, String(x['Responsable']||'').trim())) t+=agNum(x['Adeudado']); });
+      return t;
+    }
+    const raw = (typeof RAW_DATA!=='undefined' && RAW_DATA) ? RAW_DATA[String(S.snap.mes).replace(/\s+\d{4}$/,'')] : null;
+    if(!raw){
+      const po = S.snap.ppto_original;
+      if(!po) return null;
+      let t=0; Object.entries(po).forEach(([i,m])=>Object.entries(m).forEach(([r,v])=>{ if(ok(i,r)) t+=v; }));
+      return t;
+    }
+    let t=0; Object.entries(raw).forEach(([i,b])=>[...(b.facturas||[]),...(b.debitos||[])].forEach(e=>{ if(ok(i,e.responsable)) t+=Number(e.adeudado)||0; }));
+    return t;
+  }
+
   // Facturas en alcance: instituciones (BI + permisos + no-consolida) y responsable
   function scope(){
     const insts = getInsts();
@@ -5720,6 +5747,8 @@ window.AG = (function(){
     // Encabezado
     $('ag-title').textContent = 'Aging de la deuda — ' + d.mes;
     $('ag-sub').textContent = `Corte ${agFechaAR(d.corte)} · vencimiento = emisión + ${d.dias_vto||AG_DIAS_VTO} días · fuente: ${d.archivo||'Intiza'}`;
+    $('ag-corte-chip').textContent = '📅 Corte: ' + agFechaAR(d.corte);
+    $('ag-corte-chip').title = 'Deuda de Intiza al ' + agFechaAR(d.corte) + '. Atraso calculado a esta fecha.';
     const chip = $('ag-ppto-chip');
     if(S.pptoFuente==='vivo'){ chip.className='ag-chip live'; chip.textContent='● Presupuesto en vivo (Mes Actual)'; }
     else if(S.pptoFuente==='cierre'){ chip.className='ag-chip fixed'; chip.textContent='Presupuesto al cierre del mes'; }
@@ -5731,8 +5760,10 @@ window.AG = (function(){
     const sAf = anticipos.reduce((s,f)=>s+f.p,0);
     const pct = (x,t)=> t ? (x/t*100).toFixed(1).replace('.',',')+'%' : '0%';
     const mas90 = A.t[4]+A.t[5]+A.t[6];
+    const PO = pptoOriginal();
     $('ag-kpis').innerHTML = `
-      <div class="kpi-card"><div class="kpi-label">Deuda total</div><div class="kpi-value">$${f0(A.tot)}</div><div class="kpi-sub">${A.n.toLocaleString('es-AR')} facturas pendientes</div>${sAf?`<div class="ag-note">Saldos a favor (anticipos, no incluidos): −$${f0(Math.abs(sAf))}</div>`:''}</div>
+      <div class="kpi-card" style="border-top-color:#64748b"><div class="kpi-label">Presupuesto original del mes</div><div class="kpi-value">${PO==null?'—':'$'+f0(PO)}</div><div class="kpi-sub">${PO==null?'sin datos de la Proyección de '+esc(d.mes):'Proyección '+esc(d.mes)+' (igual a Mes Actual)'}</div>${PO?`<div class="ag-note">En el aging: $${f0(A.ppto)} (${pct(A.ppto,PO)}) · el resto ya no estaba pendiente en Intiza o no tiene comprobante (N/P, a cuenta)</div>`:''}</div>
+      <div class="kpi-card"><div class="kpi-label">Deuda total al ${agFechaAR(d.corte)}</div><div class="kpi-value">$${f0(A.tot)}</div><div class="kpi-sub">${A.n.toLocaleString('es-AR')} facturas pendientes</div>${sAf?`<div class="ag-note">Saldos a favor (anticipos, no incluidos): −$${f0(Math.abs(sAf))}</div>`:''}</div>
       <div class="kpi-card k-green"><div class="kpi-label">Deuda corriente</div><div class="kpi-value">$${f0(A.t[0])}</div><div class="kpi-sub">${pct(A.t[0],A.tot)} · no vencida</div></div>
       <div class="kpi-card k-amber"><div class="kpi-label">Deuda exigible</div><div class="kpi-value">$${f0(A.exig)}</div><div class="kpi-sub">${pct(A.exig,A.tot)} · vencida</div></div>
       <div class="kpi-card" style="border-top-color:#7c2d12"><div class="kpi-label">Exigible +90 días</div><div class="kpi-value">$${f0(mas90)}</div><div class="kpi-sub">${pct(mas90,A.exig)} de la exigible</div></div>
