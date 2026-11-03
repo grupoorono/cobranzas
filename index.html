@@ -1178,7 +1178,7 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
               <li><b>Fuente:</b> Excel de deuda de Intiza, bajado <b>antes</b> de cargar las cobranzas del mes.</li>
               <li><b>Corte:</b> último día del mes anterior. La deuda y los tramos quedan <b>fijos</b> todo el mes.</li>
               <li><b>Vencimiento:</b> fecha de emisión + 35 días.</li>
-              <li><b>Corriente</b> = todavía no vencida. <b>Exigible</b> = vencida, por días de atraso: 1–30, 31–60, 61–90, 91–120, 121–180 y +180.</li>
+              <li><b>No exigible</b> = todavía no vencida. <b>Exigible</b> = vencida, por días de atraso: 1–30, 31–60, 61–90, 91–120, 121–180 y +180.</li>
               <li>Los <b>anticipos</b> van aparte (saldo a favor). <b>GO, SAN NICOLAS e INECO</b> se ven solas y no suman en "Todas".</li>
             </ul>
           </div>
@@ -5444,7 +5444,7 @@ async function saveConfig(id, prefix='cfg-'){
  *    la Proyección cuando la factura está ahí, y si no con REGLAS_GO sobre el cliente.
  */
 const AG_DIAS_VTO = 35;
-const AG_TRAMOS = ['Corriente','1–30','31–60','61–90','91–120','121–180','+180'];
+const AG_TRAMOS = ['No exigible','1–30','31–60','61–90','91–120','121–180','+180'];
 const AG_PREFIJO = 'Aging ';
 
 // Intiza "Sanatorio (filtro)" -> institución del panel
@@ -5817,16 +5817,17 @@ window.AG = (function(){
     const pct = (x,t)=> t ? (x/t*100).toFixed(1).replace('.',',')+'%' : '0%';
     const mas90 = A.t[4]+A.t[5]+A.t[6];
     const PO = pptoOriginal();
+    const SFk = pptoSinFactura();
     $('ag-kpis').innerHTML = `
       <div class="ag-krow ag-k4">
       <div class="kpi-card"><div class="kpi-label">Deuda total al ${agFechaAR(d.corte)}</div><div class="kpi-value">$${f0(A.tot)}</div><div class="kpi-sub">${A.n.toLocaleString('es-AR')} facturas pendientes</div>${sAf?`<div class="ag-note">Saldos a favor (anticipos, no incluidos): −$${f0(Math.abs(sAf))}</div>`:''}</div>
-      <div class="kpi-card k-green"><div class="kpi-label">Deuda corriente</div><div class="kpi-value">$${f0(A.t[0])}</div><div class="kpi-sub">${pct(A.t[0],A.tot)} · no vencida</div></div>
+      <div class="kpi-card k-green"><div class="kpi-label">Deuda no exigible</div><div class="kpi-value">$${f0(A.t[0])}</div><div class="kpi-sub">${pct(A.t[0],A.tot)} · no vencida</div></div>
       <div class="kpi-card k-amber"><div class="kpi-label">Deuda exigible</div><div class="kpi-value">$${f0(A.exig)}</div><div class="kpi-sub">${pct(A.exig,A.tot)} · vencida</div></div>
       <div class="kpi-card" style="border-top-color:#7c2d12"><div class="kpi-label">Exigible +90 días</div><div class="kpi-value">$${f0(mas90)}</div><div class="kpi-sub">${pct(mas90,A.exig)} de la exigible</div></div>
       </div>
       <div class="ag-kgrp">Presupuesto del mes</div>
       <div class="ag-krow ag-k2">
-      <div class="kpi-card k-blue"><div class="kpi-label">Deuda presupuestada</div><div class="kpi-value">$${f0(A.ppto)}</div><div class="kpi-sub">${pct(A.ppto,A.tot)} de la deuda total · Corriente $${f0(A.pcorr)} · Exigible $${f0(A.pexig)}</div>
+      <div class="kpi-card k-blue"><div class="kpi-label">Deuda presupuestada</div><div class="kpi-value">$${f0(A.ppto)}</div><div class="kpi-sub">${pct(A.ppto,A.tot)} de la deuda total</div><div class="ag-note" style="color:#475569">Solo facturas ya emitidas. <b>No incluye lo presupuestado por importe, sin factura</b>${SFk&&SFk.t?` ($${f0(SFk.t)})`:''}.</div>
         <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--gray-200)">
           <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap">
             <span style="font-size:10px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.8px">Pendiente de cobro</span>
@@ -5835,7 +5836,12 @@ window.AG = (function(){
           <div style="font-size:22px;font-weight:700;color:#1e40af;letter-spacing:-.4px;margin-top:2px">$${f0(A.ppen)}</div>
           <div style="height:6px;background:#dbeafe;border-radius:3px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${A.ppto?Math.min(100,A.pcob/A.ppto*100).toFixed(1):0}%;background:#16a34a"></div></div>
         </div></div>
-      <div class="kpi-card" style="border-top-color:#64748b"><div class="kpi-label">Presupuesto total del mes</div><div class="kpi-value">${PO==null?'—':'$'+f0(PO)}</div><div class="kpi-sub">${PO==null?'sin datos de la Proyección de '+esc(d.mes):'Igual a Mes Actual · incluye lo presupuestado sin factura'}</div></div>
+      <div class="kpi-card" style="border-top-color:#64748b"><div class="kpi-label">Presupuesto total del mes</div><div class="kpi-value">${PO==null?'—':'$'+f0(PO)}</div><div class="kpi-sub">${PO==null?'sin datos de la Proyección de '+esc(d.mes):'Igual a Mes Actual'}</div>${(PO && SFk)?(()=>{
+          const seg=[['No exigible','no vencida',A.pcorr,'#1a6b5a','#ecfdf5'],['Exigible','vencida',A.pexig,'#9a3412','#fff7ed'],['Por importe','sin factura',SFk.t,'#475569','#f1f5f9']];
+          return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px">${seg.map(s=>`<div style="background:${s[4]};border-radius:8px;padding:10px 12px;border-top:4px solid ${s[3]}">
+              <div style="font-size:34px;font-weight:800;color:${s[3]};line-height:1;letter-spacing:-1px">${pct(s[2],PO)}</div>
+              <div style="font-size:12px;font-weight:700;color:${s[3]};margin-top:6px">${s[0]} <span style="font-weight:500;opacity:.8">· ${s[1]}</span></div>
+              <div style="font-size:11px;color:var(--gray-500);margin-top:2px">$${f0(s[2])}</div></div>`).join('')}</div>`; })():''}</div>
       </div>`;
     renderPpto(deuda);
 
@@ -5862,9 +5868,9 @@ window.AG = (function(){
       const t=l.reduce((s,f)=>s+f.p,0), c=l.filter(f=>f.pp===2).reduce((s,f)=>s+f.p,0); return {t,c,p:t-c,n:l.length}; };
     const tot = P.reduce((s,f)=>s+f.p,0);
     const pc = (a,b)=> b ? (a/b*100).toFixed(1).replace('.',',')+'%' : '—';
-    const fila = (lbl,x,cls,ind) => `<tr><td style="${ind?'padding-left:26px;font-weight:500':''}">${lbl}</td><td class="${cls||''}">${f0(x.t)}</td><td>${pc(x.t,BASE)}</td><td>${f0(x.c)}</td><td>${f0(x.p)}</td><td class="t-ppto">${pc(x.c,x.t)}</td><td>${x.n}</td></tr>`;
-    let h = `<thead><tr><th>Tramo</th><th>Presupuestado</th><th title="Sobre el presupuesto total del mes">% s/ ppto. total</th><th>Cobrado</th><th>Pendiente</th><th class="grp-ppto" title="Cobrado / presupuestado de esa fila">% Cobrado</th><th>Facturas</th></tr></thead><tbody>`;
-    if(!P.length){ $('ag-ppto-cards').innerHTML=''; $('ag-ppto-recon').innerHTML=''; h += `<tr><td colspan="7" style="text-align:center;color:var(--gray-500);padding:18px">Sin facturas presupuestadas en esta foto</td></tr></tbody>`; $('ag-ppto-table').innerHTML=h; return; }
+    const fila = (lbl,x,cls,ind) => `<tr><td style="${ind?'padding-left:26px;font-weight:500':''}">${lbl}</td><td class="${cls||''}">${f0(x.t)}</td><td>${pc(x.t,BASE)}</td><td>${f0(x.c)}</td><td>${f0(x.p)}</td><td class="t-ppto">${pc(x.c,x.t)}</td></tr>`;
+    let h = `<thead><tr><th>Tramo</th><th>Presupuestado</th><th title="Sobre el presupuesto total del mes">% s/ ppto. total</th><th>Cobrado</th><th>Pendiente</th><th class="grp-ppto" title="Cobrado / presupuestado de esa fila">% Cobrado</th></tr></thead><tbody>`;
+    if(!P.length){ $('ag-ppto-cards').innerHTML=''; $('ag-ppto-recon').innerHTML=''; h += `<tr><td colspan="6" style="text-align:center;color:var(--gray-500);padding:18px">Sin facturas presupuestadas en esta foto</td></tr></tbody>`; $('ag-ppto-table').innerHTML=h; return; }
     const C = r('c'), E = r('e');
     const PO = pptoOriginal();
     const BASE = PO || tot;   // si no hay presupuesto original, se usa lo presupuestado de la foto
@@ -5872,12 +5878,12 @@ window.AG = (function(){
         <div style="font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:.8px">${tit}</div>
         <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:4px"><span style="font-size:24px;font-weight:700;color:var(--gray-900)">$${f0(x.t)}</span><span style="font-size:14px;font-weight:700;color:${col}">${pc(x.t,BASE)} del ppto. total</span></div>
         <div style="font-size:12px;color:var(--gray-700);margin-top:4px">Cobrado $${f0(x.c)} (<b>${pc(x.c,x.t)}</b> de este tramo) · Pendiente $${f0(x.p)}</div></div>`;
-    $('ag-ppto-cards').innerHTML = card('Deuda presupuestada · corriente (no vencida)', C, '#1a6b5a', '#f0fdf4') + card('Deuda presupuestada · exigible (vencida)', E, '#9a3412', '#fff7ed');
-    h += fila('Corriente (no vencida)', C, 't-tot');
+    $('ag-ppto-cards').innerHTML = card('Deuda presupuestada · no exigible (no vencida)', C, '#1a6b5a', '#f0fdf4') + card('Deuda presupuestada · exigible (vencida)', E, '#9a3412', '#fff7ed');
+    h += fila('No exigible (no vencida)', C, 't-tot');
     h += fila('Exigible (vencida)', r('e'), 't-exig');
     for(let i=1;i<7;i++) h += fila(AG_TRAMOS[i]+' días', r(i), '', true);
     const T = {t:tot, c:P.filter(f=>f.pp===2).reduce((s,f)=>s+f.p,0), n:P.length}; T.p = T.t - T.c;
-    h += `</tbody><tfoot><tr><td>TOTAL</td><td>${f0(T.t)}</td><td>${pc(T.t,BASE)}</td><td>${f0(T.c)}</td><td>${f0(T.p)}</td><td>${pc(T.c,T.t)}</td><td>${T.n}</td></tr></tfoot>`;
+    h += `</tbody><tfoot><tr><td>TOTAL</td><td>${f0(T.t)}</td><td>${pc(T.t,BASE)}</td><td>${f0(T.c)}</td><td>${f0(T.p)}</td><td>${pc(T.c,T.t)}</td></tr></tfoot>`;
     $('ag-ppto-table').innerHTML = h;
     renderRecon(T.t);
   }
@@ -5911,7 +5917,7 @@ window.AG = (function(){
       data:{ labels:AG_TRAMOS, datasets:[
         { label:'Deuda presupuestada · cobrada', data:pc.map(M), backgroundColor:'#93c5fd', borderRadius:3, stack:'s' },
         { label:'Deuda presupuestada · pendiente', data:pp.map(M), backgroundColor:'#2563a8', borderRadius:3, stack:'s' },
-        { label:'Corriente no presupuestada', data:np.map((v,i)=>i===0?M(v):0), backgroundColor:'#1a6b5a', borderRadius:3, stack:'s' },
+        { label:'No exigible no presupuestada', data:np.map((v,i)=>i===0?M(v):0), backgroundColor:'#1a6b5a', borderRadius:3, stack:'s' },
         { label:'Exigible no presupuestada', data:np.map((v,i)=>i===0?0:M(v)), backgroundColor:'#a0714f', borderRadius:3, stack:'s' }
       ]},
       options:{ responsive:true, maintainAspectRatio:false, animation:false,
@@ -6005,8 +6011,8 @@ window.AG = (function(){
     try{
       const list = detRows(null).sort((a,b)=> a.i.localeCompare(b.i) || a.c.localeCompare(b.c) || b.at-a.at);
       if(!list.length){ alert('No hay facturas para exportar con los filtros actuales.'); return; }
-      const aoa = [['Institución','Financiador','Comprobante','Tipo','Fecha emisión','Vencimiento (+'+(S.snap.dias_vto||AG_DIAS_VTO)+')','Días atraso','Tramo','Corriente / Exigible','Monto','Pendiente','Responsable','Presupuesto del mes']];
-      list.forEach(f=>aoa.push([f.i,f.c,f.f,f.t,agFechaAR(f.e),agFechaAR(f.vto),f.af?'':Math.max(0,f.at),f.af?'Saldo a favor':AG_TRAMOS[f.tr],f.af?'':(f.tr===0?'Corriente':'Exigible'),f.m,f.p,f.r,f.pp===1?'SI - PENDIENTE':(f.pp===2?'SI - COBRADA':'NO')]));
+      const aoa = [['Institución','Financiador','Comprobante','Tipo','Fecha emisión','Vencimiento (+'+(S.snap.dias_vto||AG_DIAS_VTO)+')','Días atraso','Tramo','No exigible / Exigible','Monto','Pendiente','Responsable','Presupuesto del mes']];
+      list.forEach(f=>aoa.push([f.i,f.c,f.f,f.t,agFechaAR(f.e),agFechaAR(f.vto),f.af?'':Math.max(0,f.at),f.af?'Saldo a favor':AG_TRAMOS[f.tr],f.af?'':(f.tr===0?'No exigible':'Exigible'),f.m,f.p,f.r,f.pp===1?'SI - PENDIENTE':(f.pp===2?'SI - COBRADA':'NO')]));
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       for(let r=1;r<aoa.length;r++) [9,10].forEach(c=>{ const cell=ws[XLSX.utils.encode_cell({r,c})]; if(cell&&cell.t==='n') cell.z='#,##0.00'; });
       ws['!cols'] = aoa[0].map((_,i)=>({wch:[12,34,18,10,12,14,10,11,12,16,16,12,16][i]}));
