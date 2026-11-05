@@ -665,6 +665,7 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
   <button class="deb-reset" type="button" onclick="clearCompFin()">Limpiar</button>
 </div>
 <div id="comp-fin-chips" class="ms-chips-bar"></div>
+<div class="nota-sn" style="margin:0 0 14px;padding:9px 13px;border-left:3px solid #f5a623;background:rgba(245,166,35,.10);border-radius:6px;font-size:12.5px;line-height:1.45">⚠️ <b>SAN NICOLAS suma en "Todas" desde agosto 2026</b>, que es cuando se incorporó al panel. Los meses anteriores no la incluyen, así que el salto de julio a agosto no es una variación real.</div>
 
 <div class="sec-title" id="comp-sec-title">KPIs Mensuales — Enero a Mayo 2026</div>
 <div class="chart-card">
@@ -786,6 +787,7 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
 
   <div class="kpi-row" id="deb-kpis"></div>
 
+  <div class="nota-sn" style="margin:0 0 14px;padding:9px 13px;border-left:3px solid #f5a623;background:rgba(245,166,35,.10);border-radius:6px;font-size:12.5px;line-height:1.45">⚠️ <b>SAN NICOLAS suma en "Todas" desde agosto 2026</b>, que es cuando se incorporó al panel. Los meses anteriores no la incluyen, así que el salto de julio a agosto no es una variación real.</div>
   <!-- 1. Evolución Mensual -->
   <div class="sec-title" style="margin-top:20px">1. Evolución Mensual de Débitos</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -1179,7 +1181,7 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
               <li><b>Corte:</b> último día del mes anterior. La deuda y los tramos quedan <b>fijos</b> todo el mes.</li>
               <li><b>Vencimiento:</b> fecha de emisión + 35 días.</li>
               <li><b>No exigible</b> = todavía no vencida. <b>Exigible</b> = vencida, por días de atraso: 1–30, 31–60, 61–90, 91–120, 121–180 y +180.</li>
-              <li>Los <b>anticipos</b> van aparte (saldo a favor). <b>GO, SAN NICOLAS e INECO</b> se ven solas y no suman en "Todas".</li>
+              <li>Los <b>anticipos</b> van aparte (saldo a favor). <b>GO e INECO</b> se ven solas y no suman en "Todas".</li>
             </ul>
           </div>
           <div>
@@ -1462,7 +1464,8 @@ function instHojaGO(colA, fin){ return reglaGO(fin) || reglaGO(colA) || 'GO'; }
 // Comparativo, Débitos, IAPOS, etc.): la institución pasa a sumar en "Todas" y
 // aparece como bloque propio en los detalles por institución. No hay otras listas
 // de instituciones fijas que tocar.
-const INSTS_NO_CONSOLIDA = INSTS_HOJA_GO.slice();
+// Nov 2026: SAN NICOLAS pasa a consolidar en "Todas" (en todas las pestañas).
+const INSTS_NO_CONSOLIDA = ['GO','INECO'];
 const CONSOLIDA_INSTS = ALL_INSTS.filter(i=>!INSTS_NO_CONSOLIDA.includes(i));
 const INST_NAMES = ALL_INSTS;
 // ── PERMISOS DE INSTITUCIÓN ────────────────────────────────────────────────
