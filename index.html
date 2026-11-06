@@ -1158,6 +1158,9 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
   #page-aging .ag-btn{background:var(--navy);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer}
   #page-aging .ag-btn.ghost{background:#fff;color:var(--navy);border:1px solid var(--gray-300)}
   #page-aging .scroll{overflow:auto;max-height:560px}
+  #page-aging .ag-ver-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:18px 0 0;padding:10px 14px;background:#fff;border:1px solid var(--gray-200);border-left:4px solid var(--navy);border-radius:6px}
+  #page-aging .ag-ver-bar label{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.6px}
+  #page-aging .ag-ver-bar span{font-size:11px;color:var(--gray-500)}
   #page-aging .ag-help{background:#fff;border:1px solid var(--gray-200);border-left:4px solid var(--accent-blue);border-radius:6px;padding:10px 16px;margin:0 0 14px}
   #page-aging .ag-help summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--navy);list-style:revert}
   #page-aging .ag-help-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:8px}
@@ -1204,19 +1207,13 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
       <div class="ag-controls no-print">
         <div class="ag-ctl"><label>Foto</label><select id="ag-snap" class="ag-select" onchange="AG.pickSnap(this.value)"></select></div>
         <div class="ag-ctl"><label>Responsable</label><select id="ag-resp" class="ag-select" onchange="AG.setResp(this.value)"></select></div>
-        <div class="ag-ctl"><label>Financiador</label><select id="ag-finf" class="ag-select" style="max-width:260px" onchange="AG.setFinF(this.value)"></select></div>
-        <div class="ag-ctl"><label>Ver</label>
-          <select id="ag-ver" class="ag-select" onchange="AG.setVer(this.value)">
-            <option value="todo">Toda la deuda</option>
-            <option value="ppto">Solo deuda presupuestada (cobrada y pendiente)</option>
-            <option value="noppto">Solo deuda no presupuestada</option>
-          </select>
-        </div>
+        <div class="ag-ctl"><label>Financiador</label><div style="background:#fff;border:1px solid var(--gray-300);border-radius:6px;padding:0 10px;width:260px"><div id="ag-finf" class="ms-cont"></div></div></div>
         <span id="ag-corte-chip" class="ag-chip" style="font-size:13px;font-weight:700;color:#7c2d12;background:#fff7ed;border-color:#fed7aa"></span>
         <span id="ag-ppto-chip" class="ag-chip"></span>
         <button class="ag-btn ghost" style="margin-left:auto" onclick="AG.exportDetalle()">⬇ Descargar todo el detalle</button>
       </div>
 
+      <div id="ag-fin-chips" class="ms-chips-bar"></div>
       <div class="kpi-row" id="ag-kpis"></div>
 
       <div class="filter-label" style="margin-top:20px">🔎 Filtrar toda la hoja por institución</div>
@@ -1229,6 +1226,15 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
         <div id="ag-ppto-recon"></div>
       </div>
 
+      <div class="ag-ver-bar no-print">
+        <label>Ver en las tablas, el gráfico y el detalle</label>
+        <select id="ag-ver" class="ag-select" onchange="AG.setVer(this.value)">
+          <option value="todo">Toda la deuda</option>
+          <option value="ppto">Solo deuda presupuestada (cobrada y pendiente)</option>
+          <option value="noppto">Solo deuda no presupuestada</option>
+        </select>
+        <span>Las tarjetas de arriba muestran siempre toda la deuda.</span>
+      </div>
       <div class="ag-grid">
         <div class="tc">
           <div class="tc-head"><h3>Aging por institución</h3><span>clic en la fila para ver sus financiadores</span></div>
@@ -5682,10 +5688,10 @@ function agAdminPaso4HTML(){
 
 // ── PESTAÑA ──
 window.AG = (function(){
-  const S = { snaps:[], snap:null, cache:{}, resp:'', ver:'todo', finF:'', fin:null, sort:{col:'tot',asc:false}, live:false, chart:null };
+  const S = { snaps:[], snap:null, cache:{}, resp:'', ver:'todo', finFs:[], finOpts:[], fin:null, sort:{col:'tot',asc:false}, live:false, chart:null };
   // Los filtros se conservan al recargar (el botón de institución recarga la página)
-  try{ const g = JSON.parse(sessionStorage.getItem('ag_filtros')||'{}'); S.resp=g.resp||''; S.ver=g.ver||'todo'; S.finF=g.finF||''; }catch(e){}
-  const guardar = ()=>{ try{ sessionStorage.setItem('ag_filtros', JSON.stringify({resp:S.resp, ver:S.ver, finF:S.finF})); }catch(e){} };
+  try{ const g = JSON.parse(sessionStorage.getItem('ag_filtros')||'{}'); S.resp=g.resp||''; S.ver=g.ver||'todo'; S.finFs=Array.isArray(g.finFs)?g.finFs:[]; }catch(e){}
+  const guardar = ()=>{ try{ sessionStorage.setItem('ag_filtros', JSON.stringify({resp:S.resp, ver:S.ver, finFs:S.finFs})); }catch(e){} };
   const $ = id => document.getElementById(id);
   const f0 = n => Math.round(n||0).toLocaleString('es-AR');
   const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -5774,7 +5780,7 @@ window.AG = (function(){
   // Mes en curso: feed en vivo. Mes cerrado: Excel archivado de ese mes (RAW_DATA).
   // Presupuesto cargado por importe, sin número de factura (IAPOS por quincena, Medicina Esencial, etc.)
   function pptoSinFactura(){
-    const insts = getInsts(), ok = (i,r,fin)=> insts.includes(i) && (!S.resp || ((S.respInt||{})[String(fin||'').trim()] || agResp(r))===S.resp) && (!S.finF || String(fin||'').trim()===S.finF);
+    const insts = getInsts(), ok = (i,r,fin)=> insts.includes(i) && (!S.resp || ((S.respInt||{})[String(fin||'').trim()] || agResp(r))===S.resp) && (!S.finFs.length || S.finFs.includes(String(fin||'').trim()));
     const esFc = c => /^[A-Z]+-\d+-\d+$/.test(agNormComp(c));
     const out = {t:0, det:{}};
     const add = (fin,v)=>{ out.t+=v; out.det[fin]=(out.det[fin]||0)+v; };
@@ -5791,7 +5797,7 @@ window.AG = (function(){
   }
 
   function pptoOriginal(){
-    const insts = getInsts(), ok = (i,r,fin)=> insts.includes(i) && (!S.resp || ((S.respInt||{})[String(fin||'').trim()] || agResp(r))===S.resp) && (!S.finF || String(fin||'').trim()===S.finF);
+    const insts = getInsts(), ok = (i,r,fin)=> insts.includes(i) && (!S.resp || ((S.respInt||{})[String(fin||'').trim()] || agResp(r))===S.resp) && (!S.finFs.length || S.finFs.includes(String(fin||'').trim()));
     if(S.pptoFuente==='vivo' && Array.isArray(window._liveRowsAll)){
       let t=0; window._liveRowsAll.forEach(x=>{ const i=String(x['Institucion']||'').trim(); if(ok(i, x['Responsable'], x['Financiador'])) t+=agNum(x['Adeudado']); });
       return t;
@@ -5799,7 +5805,7 @@ window.AG = (function(){
     const raw = (typeof RAW_DATA!=='undefined' && RAW_DATA) ? RAW_DATA[String(S.snap.mes).replace(/\s+\d{4}$/,'')] : null;
     if(!raw){
       const po = S.snap.ppto_original;
-      if(!po || S.finF) return null;
+      if(!po || S.finFs.length) return null;
       let t=0; Object.entries(po).forEach(([i,m])=>Object.entries(m).forEach(([r,v])=>{ if(insts.includes(i) && (!S.resp || agResp(r)===S.resp)) t+=v; }));
       return t;
     }
@@ -5808,9 +5814,15 @@ window.AG = (function(){
   }
 
   // Facturas en alcance: instituciones (BI + permisos + no-consolida) y responsable
+  function onFinChange(){
+    S.finFs = MultiSel.getSelected('ag-finf');
+    S.fin = S.finFs.length===1 ? S.finFs[0] : null;
+    guardar(); render();
+  }
+
   function scope(sinFin){
     const insts = getInsts();
-    return S.snap.facturas.filter(f=>insts.includes(f.i) && (!S.resp || f.r===S.resp) && (sinFin || !S.finF || f.c===S.finF));
+    return S.snap.facturas.filter(f=>insts.includes(f.i) && (!S.resp || f.r===S.resp) && (sinFin || !S.finFs.length || S.finFs.includes(f.c)));
   }
   // Filas de las tablas: facturas según "Ver" + anticipos (que restan), salvo en "solo presupuestada"
   const filasTabla = () => scope().filter(f=> f.af ? S.ver!=='ppto' : pasaVer(f));
@@ -5831,8 +5843,14 @@ window.AG = (function(){
     const rowsT = filasTabla();
     // opciones de financiador (según institución y responsable)
     const fins = [...new Set(scope(true).map(f=>f.c).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
-    if(S.finF && !fins.includes(S.finF)){ S.finF=''; guardar(); return render(); }
-    $('ag-finf').innerHTML = '<option value="">Todos</option>' + fins.map(n=>`<option value="${esc(n)}" ${n===S.finF?'selected':''}>${esc(n)}</option>`).join('');
+    S.finOpts = fins;
+    if(!S.msOk){
+      MultiSel.create('ag-finf', { getOptions: ()=>S.finOpts, onChange: onFinChange, allLabel: 'Todos los financiadores', chipsId: 'ag-fin-chips' });
+      S.msOk = true;
+    }
+    const validos = S.finFs.filter(n=>fins.includes(n));
+    if(validos.length !== S.finFs.length){ S.finFs = validos; guardar(); }
+    MultiSel.setSelected('ag-finf', S.finFs);
 
     // Encabezado
     $('ag-title').textContent = 'Aging de la deuda — ' + d.mes;
@@ -6070,7 +6088,6 @@ window.AG = (function(){
     load, pickSnap,
     setResp(v){ S.resp=v; S.fin=null; guardar(); render(); },
     setVer(v){ S.ver=v; guardar(); render(); },
-    setFinF(v){ S.finF=v; S.fin = v || null; guardar(); render(); },
     sortBy(c){ if(S.sort.col===c) S.sort.asc=!S.sort.asc; else S.sort={col:c, asc:c==='name'}; renderFin(filasTabla()); },
     pickFin(n){ S.fin = (S.fin===n)?null:n; renderFin(filasTabla()); renderDet(); if(S.fin) $('ag-det-wrap').scrollIntoView({behavior:'smooth',block:'start'}); },
     exportDetalle
