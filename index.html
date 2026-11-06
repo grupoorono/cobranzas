@@ -5814,8 +5814,19 @@ window.AG = (function(){
   }
 
   // Facturas en alcance: instituciones (BI + permisos + no-consolida) y responsable
+  // Etiquetas de financiadores elegidos: hasta 6 + "+N más" + "Quitar todos"
+  function chipsFin(){
+    const box = $('ag-fin-chips'); if(!box) return;
+    const sel = S.finFs, MAX = 6;
+    if(!sel.length){ box.innerHTML=''; return; }
+    box.innerHTML = sel.slice(0,MAX).map(o=>`<span class="ms-chip" title="${esc(o)}"><span>${esc(o)}</span><b onclick="AG.quitarFin(this.parentNode.title)">×</b></span>`).join('')
+      + (sel.length>MAX ? `<span class="ms-chip" style="background:#e2e8f0;color:#334155" title="${esc(sel.slice(MAX).join(', '))}"><span>+${sel.length-MAX} más</span></span>` : '')
+      + `<span class="ms-chip" style="background:#fee2e2;color:#991b1b;cursor:pointer" onclick="AG.quitarFin('')"><span>Quitar todos</span></span>`;
+  }
   function onFinChange(){
     S.finFs = MultiSel.getSelected('ag-finf');
+    // Todos tildados = sin filtro
+    if(S.finFs.length && S.finFs.length >= S.finOpts.length){ S.finFs = []; MultiSel.setSelected('ag-finf', []); }
     S.fin = S.finFs.length===1 ? S.finFs[0] : null;
     guardar(); render();
   }
@@ -5845,12 +5856,13 @@ window.AG = (function(){
     const fins = [...new Set(scope(true).map(f=>f.c).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
     S.finOpts = fins;
     if(!S.msOk){
-      MultiSel.create('ag-finf', { getOptions: ()=>S.finOpts, onChange: onFinChange, allLabel: 'Todos los financiadores', chipsId: 'ag-fin-chips' });
+      MultiSel.create('ag-finf', { getOptions: ()=>S.finOpts, onChange: onFinChange, allLabel: 'Todos los financiadores' });
       S.msOk = true;
     }
     const validos = S.finFs.filter(n=>fins.includes(n));
     if(validos.length !== S.finFs.length){ S.finFs = validos; guardar(); }
     MultiSel.setSelected('ag-finf', S.finFs);
+    chipsFin();
 
     // Encabezado
     $('ag-title').textContent = 'Aging de la deuda — ' + d.mes;
@@ -6087,6 +6099,7 @@ window.AG = (function(){
   return {
     load, pickSnap,
     setResp(v){ S.resp=v; S.fin=null; guardar(); render(); },
+    quitarFin(n){ S.finFs = n ? S.finFs.filter(x=>x!==n) : []; S.fin = S.finFs.length===1 ? S.finFs[0] : null; MultiSel.setSelected('ag-finf', S.finFs); guardar(); render(); },
     setVer(v){ S.ver=v; guardar(); render(); },
     sortBy(c){ if(S.sort.col===c) S.sort.asc=!S.sort.asc; else S.sort={col:c, asc:c==='name'}; renderFin(filasTabla()); },
     pickFin(n){ S.fin = (S.fin===n)?null:n; renderFin(filasTabla()); renderDet(); if(S.fin) $('ag-det-wrap').scrollIntoView({behavior:'smooth',block:'start'}); },
