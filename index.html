@@ -5970,9 +5970,15 @@ window.AG = (function(){
   function cellsTramos(a){
     return a.t.map((v,i)=>`<td class="${Math.round(v)===0?'zero':heat(i)}">${f0(v)}</td>`).join('');
   }
+  // No exigible · Exigible · apertura del exigible (1–30 … +180)
+  function cellsAging(a){
+    const c = (v,i)=>`<td class="${Math.round(v)===0?'zero':heat(i)}">${f0(v)}</td>`;
+    return c(a.t[0],0) + `<td class="t-exig">${f0(a.exig)}</td>` + a.t.slice(1).map((v,i)=>c(v,i+1)).join('');
+  }
+  const footAging = a => `<td>${f0(a.t[0])}</td><td>${f0(a.exig)}</td>` + a.t.slice(1).map(v=>`<td>${f0(v)}</td>`).join('');
   function headRow(first, sortable){
     const th = (k,txt,cls='') => sortable ? `<th class="sortable ${cls}" onclick="AG.sortBy('${k}')">${txt}${S.sort.col===k?(S.sort.asc?' ▲':' ▼'):''}</th>` : `<th class="${cls}">${txt}</th>`;
-    return `<thead><tr>${th('name',first)}${sortable?th('part','% Part.'):''}${th('tot','Total')}${th('ant','Anticipos')}${AG_TRAMOS.map((t,i)=>th('t'+i,t,i===0?'grp-corr':'grp-exig')).join('')}${th('exig','Exigible','grp-exig')}${th('pexig','Ppto. exigible','grp-ppto')}${th('pc','% Cobr. ppto. exig.','grp-ppto')}</tr></thead>`;
+    return `<thead><tr>${th('name',first)}${sortable?th('part','% Part.'):''}${th('tot','Total')}${th('ant','Anticipos')}${th('t0',AG_TRAMOS[0],'grp-corr')}${th('exig','Exigible','grp-exig')}${AG_TRAMOS.slice(1).map((t,i)=>th('t'+(i+1),t,'grp-exig')).join('')}${th('pexig','Ppto. exigible','grp-ppto')}${th('pc','% Cobr. ppto. exig.','grp-ppto')}</tr></thead>`;
   }
 
   function renderInst(rows){
@@ -5985,11 +5991,11 @@ window.AG = (function(){
       if(!by[i].length) return;
       const a = acum(by[i]);
       const clk = insts.length>1 ? ` class="clk" onclick="setActiveInst('${i}')" title="Filtrar la hoja por ${i}"` : '';
-      h += `<tr${clk}><td>${i}</td><td class="t-tot">${f0(a.tot)}</td>${antCell(a)}${cellsTramos(a)}<td class="t-exig">${f0(a.exig)}</td>${pptoCells(a)}</tr>`;
+      h += `<tr${clk}><td>${i}</td><td class="t-tot">${f0(a.tot)}</td>${antCell(a)}${cellsAging(a)}${pptoCells(a)}</tr>`;
     });
     if(!rows.length) h += `<tr><td colspan="13" style="text-align:center;color:var(--gray-500);padding:20px">Sin deuda para los filtros elegidos</td></tr>`;
     h += '</tbody>';
-    if(insts.length>1 && rows.length) h += `<tfoot><tr><td>TOTAL</td><td>${f0(tot.tot)}</td><td>${f0(tot.ant)}</td>${tot.t.map(v=>`<td>${f0(v)}</td>`).join('')}<td>${f0(tot.exig)}</td>${pptoFoot(tot)}</tr></tfoot>`;
+    if(insts.length>1 && rows.length) h += `<tfoot><tr><td>TOTAL</td><td>${f0(tot.tot)}</td><td>${f0(tot.ant)}</td>${footAging(tot)}${pptoFoot(tot)}</tr></tfoot>`;
     $('ag-inst-table').innerHTML = h;
   }
 
@@ -6007,10 +6013,10 @@ window.AG = (function(){
     const tot = acum(rows);
     let h = headRow('Financiador', true) + '<tbody>';
     data.forEach(d=>{
-      h += `<tr class="clk${S.fin===d.name?' sel':''}" onclick="AG.pickFin(this.dataset.f)" data-f="${esc(d.name)}"><td>${esc(d.name)}</td><td>${d.part.toFixed(2).replace('.',',')}%</td><td class="t-tot">${f0(d.a.tot)}</td>${antCell(d.a)}${cellsTramos(d.a)}<td class="t-exig">${f0(d.a.exig)}</td>${pptoCells(d.a)}</tr>`;
+      h += `<tr class="clk${S.fin===d.name?' sel':''}" onclick="AG.pickFin(this.dataset.f)" data-f="${esc(d.name)}"><td>${esc(d.name)}</td><td>${d.part.toFixed(2).replace('.',',')}%</td><td class="t-tot">${f0(d.a.tot)}</td>${antCell(d.a)}${cellsAging(d.a)}${pptoCells(d.a)}</tr>`;
     });
     h += '</tbody>';
-    if(data.length) h += `<tfoot><tr><td>TOTAL</td><td>100%</td><td>${f0(tot.tot)}</td><td>${f0(tot.ant)}</td>${tot.t.map(v=>`<td>${f0(v)}</td>`).join('')}<td>${f0(tot.exig)}</td>${pptoFoot(tot)}</tr></tfoot>`;
+    if(data.length) h += `<tfoot><tr><td>TOTAL</td><td>100%</td><td>${f0(tot.tot)}</td><td>${f0(tot.ant)}</td>${footAging(tot)}${pptoFoot(tot)}</tr></tfoot>`;
     $('ag-fin-table').innerHTML = h;
     $('ag-fin-count').textContent = `(${data.length} financiadores)`;
   }
