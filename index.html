@@ -5688,10 +5688,10 @@ function agAdminPaso4HTML(){
 
 // ── PESTAÑA ──
 window.AG = (function(){
-  const S = { snaps:[], snap:null, cache:{}, resp:'', ver:'todo', finFs:[], finOpts:[], fin:null, sort:{col:'tot',asc:false}, live:false, chart:null };
+  const S = { snaps:[], snap:null, cache:{}, resp:'', ver:'todo', finMode:'', finList:[], finOpts:[], fin:null, sort:{col:'tot',asc:false}, live:false, chart:null };
   // Los filtros se conservan al recargar (el botón de institución recarga la página)
-  try{ const g = JSON.parse(sessionStorage.getItem('ag_filtros')||'{}'); S.resp=g.resp||''; S.ver=g.ver||'todo'; S.finFs=Array.isArray(g.finFs)?g.finFs:[]; }catch(e){}
-  const guardar = ()=>{ try{ sessionStorage.setItem('ag_filtros', JSON.stringify({resp:S.resp, ver:S.ver, finFs:S.finFs})); }catch(e){} };
+  try{ const g = JSON.parse(sessionStorage.getItem('ag_filtros')||'{}'); S.resp=g.resp||''; S.ver=g.ver||'todo'; S.finMode=g.finMode||''; S.finList=Array.isArray(g.finList)?g.finList:[]; }catch(e){}
+  const guardar = ()=>{ try{ sessionStorage.setItem('ag_filtros', JSON.stringify({resp:S.resp, ver:S.ver, finMode:S.finMode, finList:S.finList})); }catch(e){} };
   const $ = id => document.getElementById(id);
   const f0 = n => Math.round(n||0).toLocaleString('es-AR');
   const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -5780,7 +5780,7 @@ window.AG = (function(){
   // Mes en curso: feed en vivo. Mes cerrado: Excel archivado de ese mes (RAW_DATA).
   // Presupuesto cargado por importe, sin número de factura (IAPOS por quincena, Medicina Esencial, etc.)
   function pptoSinFactura(){
-    const insts = getInsts(), ok = (i,r,fin)=> insts.includes(i) && (!S.resp || ((S.respInt||{})[String(fin||'').trim()] || agResp(r))===S.resp) && (!S.finFs.length || S.finFs.includes(String(fin||'').trim()));
+    const insts = getInsts(), ok = (i,r,fin)=> insts.includes(i) && (!S.resp || ((S.respInt||{})[String(fin||'').trim()] || agResp(r))===S.resp) && (!finActivos().length || finActivos().includes(String(fin||'').trim()));
     const esFc = c => /^[A-Z]+-\d+-\d+$/.test(agNormComp(c));
     const out = {t:0, det:{}};
     const add = (fin,v)=>{ out.t+=v; out.det[fin]=(out.det[fin]||0)+v; };
@@ -5797,7 +5797,7 @@ window.AG = (function(){
   }
 
   function pptoOriginal(){
-    const insts = getInsts(), ok = (i,r,fin)=> insts.includes(i) && (!S.resp || ((S.respInt||{})[String(fin||'').trim()] || agResp(r))===S.resp) && (!S.finFs.length || S.finFs.includes(String(fin||'').trim()));
+    const insts = getInsts(), ok = (i,r,fin)=> insts.includes(i) && (!S.resp || ((S.respInt||{})[String(fin||'').trim()] || agResp(r))===S.resp) && (!finActivos().length || finActivos().includes(String(fin||'').trim()));
     if(S.pptoFuente==='vivo' && Array.isArray(window._liveRowsAll)){
       let t=0; window._liveRowsAll.forEach(x=>{ const i=String(x['Institucion']||'').trim(); if(ok(i, x['Responsable'], x['Financiador'])) t+=agNum(x['Adeudado']); });
       return t;
@@ -5805,7 +5805,7 @@ window.AG = (function(){
     const raw = (typeof RAW_DATA!=='undefined' && RAW_DATA) ? RAW_DATA[String(S.snap.mes).replace(/\s+\d{4}$/,'')] : null;
     if(!raw){
       const po = S.snap.ppto_original;
-      if(!po || S.finFs.length) return null;
+      if(!po || finActivos().length) return null;
       let t=0; Object.entries(po).forEach(([i,m])=>Object.entries(m).forEach(([r,v])=>{ if(insts.includes(i) && (!S.resp || agResp(r)===S.resp)) t+=v; }));
       return t;
     }
@@ -5817,23 +5817,41 @@ window.AG = (function(){
   // Etiquetas de financiadores elegidos: hasta 6 + "+N más" + "Quitar todos"
   function chipsFin(){
     const box = $('ag-fin-chips'); if(!box) return;
-    const sel = S.finFs, MAX = 6;
+    const sel = finActivos(), MAX = 6;
     if(!sel.length){ box.innerHTML=''; return; }
+    if(S.finMode==='exc'){
+      const exc = S.finList.filter(o=>S.finOpts.includes(o));
+      box.innerHTML = `<span style="font-size:11px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.6px;align-self:center">Todos menos:</span>`
+        + exc.map(o=>`<span class="ms-chip" style="background:#fff7ed;color:#9a3412" title="${esc(o)} — clic en × para volver a incluirlo"><span>${esc(o)}</span><b onclick="AG.incluirFin(this.parentNode.title.split(' — ')[0])">×</b></span>`).join('')
+        + `<span class="ms-chip" style="background:#fee2e2;color:#991b1b;cursor:pointer" onclick="AG.quitarFin('')"><span>Quitar filtro</span></span>`;
+      return;
+    }
     box.innerHTML = sel.slice(0,MAX).map(o=>`<span class="ms-chip" title="${esc(o)}"><span>${esc(o)}</span><b onclick="AG.quitarFin(this.parentNode.title)">×</b></span>`).join('')
       + (sel.length>MAX ? `<span class="ms-chip" style="background:#e2e8f0;color:#334155" title="${esc(sel.slice(MAX).join(', '))}"><span>+${sel.length-MAX} más</span></span>` : '')
       + `<span class="ms-chip" style="background:#fee2e2;color:#991b1b;cursor:pointer" onclick="AG.quitarFin('')"><span>Quitar todos</span></span>`;
   }
+  // Financiadores que filtran: ninguno tildado o todos tildados = sin filtro
+  // Filtro de financiador: '' = todos · 'all' = todos tildados · 'inc' = solo los de finList · 'exc' = todos menos finList
+  // (los excluidos se guardan como exclusión, así al cambiar de institución entran los financiadores nuevos)
+  function finActivos(){
+    if(S.finMode==='inc'){ const l = S.finList.filter(n=>S.finOpts.includes(n)); return l.length===S.finOpts.length ? [] : l; }
+    if(S.finMode==='exc'){ const l = S.finOpts.filter(n=>!S.finList.includes(n)); return l.length===S.finOpts.length ? [] : l; }
+    return [];
+  }
+  const finTildados = () => S.finMode==='all' ? S.finOpts.slice() : S.finMode==='exc' ? S.finOpts.filter(n=>!S.finList.includes(n)) : S.finMode==='inc' ? S.finList.filter(n=>S.finOpts.includes(n)) : [];
   function onFinChange(){
-    S.finFs = MultiSel.getSelected('ag-finf');
-    // Todos tildados = sin filtro
-    if(S.finFs.length && S.finFs.length >= S.finOpts.length){ S.finFs = []; MultiSel.setSelected('ag-finf', []); }
-    S.fin = S.finFs.length===1 ? S.finFs[0] : null;
+    const sel = MultiSel.getSelected('ag-finf'), n = S.finOpts.length;
+    if(!sel.length){ S.finMode=''; S.finList=[]; }
+    else if(sel.length===n){ S.finMode='all'; S.finList=[]; }
+    else if(sel.length > n/2){ S.finMode='exc'; S.finList = S.finOpts.filter(o=>!sel.includes(o)); }
+    else { S.finMode='inc'; S.finList = sel; }
+    const act = finActivos(); S.fin = act.length===1 ? act[0] : null;
     guardar(); render();
   }
 
   function scope(sinFin){
     const insts = getInsts();
-    return S.snap.facturas.filter(f=>insts.includes(f.i) && (!S.resp || f.r===S.resp) && (sinFin || !S.finFs.length || S.finFs.includes(f.c)));
+    return S.snap.facturas.filter(f=>insts.includes(f.i) && (!S.resp || f.r===S.resp) && (sinFin || !finActivos().length || finActivos().includes(f.c)));
   }
   // Filas de las tablas: facturas según "Ver" + anticipos (que restan), salvo en "solo presupuestada"
   const filasTabla = () => scope().filter(f=> f.af ? S.ver!=='ppto' : pasaVer(f));
@@ -5847,21 +5865,20 @@ window.AG = (function(){
 
   function render(){
     const d = S.snap;
+    // opciones de financiador (según institución y responsable) — antes de filtrar
+    S.finOpts = [...new Set(scope(true).map(f=>f.c).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
     const all = scope();
     const deuda = all.filter(f=>!f.af);
     const anticipos = all.filter(f=>f.af);
     const rows = deuda.filter(pasaVer);
     const rowsT = filasTabla();
     // opciones de financiador (según institución y responsable)
-    const fins = [...new Set(scope(true).map(f=>f.c).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
-    S.finOpts = fins;
+    const fins = S.finOpts;
     if(!S.msOk){
       MultiSel.create('ag-finf', { getOptions: ()=>S.finOpts, onChange: onFinChange, allLabel: 'Todos los financiadores' });
       S.msOk = true;
     }
-    const validos = S.finFs.filter(n=>fins.includes(n));
-    if(validos.length !== S.finFs.length){ S.finFs = validos; guardar(); }
-    MultiSel.setSelected('ag-finf', S.finFs);
+    MultiSel.setSelected('ag-finf', finTildados());
     chipsFin();
 
     // Encabezado
@@ -6099,7 +6116,9 @@ window.AG = (function(){
   return {
     load, pickSnap,
     setResp(v){ S.resp=v; S.fin=null; guardar(); render(); },
-    quitarFin(n){ S.finFs = n ? S.finFs.filter(x=>x!==n) : []; S.fin = S.finFs.length===1 ? S.finFs[0] : null; MultiSel.setSelected('ag-finf', S.finFs); guardar(); render(); },
+    incluirFin(n){ S.finList = S.finList.filter(x=>x!==n); if(!S.finList.length) S.finMode='all'; S.fin=null; guardar(); render(); },
+    quitarFin(n){ if(n){ S.finList = S.finList.filter(x=>x!==n); if(!S.finList.length) S.finMode=''; } else { S.finMode=''; S.finList=[]; }
+      const act = finActivos(); S.fin = act.length===1 ? act[0] : null; guardar(); render(); },
     setVer(v){ S.ver=v; guardar(); render(); },
     sortBy(c){ if(S.sort.col===c) S.sort.asc=!S.sort.asc; else S.sort={col:c, asc:c==='name'}; renderFin(filasTabla()); },
     pickFin(n){ S.fin = (S.fin===n)?null:n; renderFin(filasTabla()); renderDet(); if(S.fin) $('ag-det-wrap').scrollIntoView({behavior:'smooth',block:'start'}); },
