@@ -1189,7 +1189,7 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
               <li><b>Corte:</b> último día del mes anterior. La deuda y los tramos quedan <b>fijos</b> todo el mes.</li>
               <li><b>Vencimiento:</b> fecha de emisión + 35 días.</li>
               <li><b>No exigible</b> = todavía no vencida. <b>Exigible</b> = vencida, por días de atraso: 1–30, 31–60, 61–90, 91–120, 121–180 y +180.</li>
-              <li>Los <b>anticipos</b> se descuentan de la deuda total y de cada financiador (columna Anticipos); no entran en los tramos. <b>GO e INECO</b> se ven solas y no suman en "Todas".</li>
+              <li>Los <b>anticipos</b> se descuentan de la deuda total y de la deuda exigible (tarjetas de arriba). En las tablas van en su propia columna y no entran en los tramos. <b>GO e INECO</b> se ven solas y no suman en "Todas".</li>
             </ul>
           </div>
           <div>
@@ -1227,7 +1227,7 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
       </div>
 
       <div class="ag-ver-bar no-print">
-        <label>Ver en las tablas, el gráfico y el detalle</label>
+        <label>Ver en las tablas y el detalle</label>
         <select id="ag-ver" class="ag-select" onchange="AG.setVer(this.value)">
           <option value="todo">Toda la deuda</option>
           <option value="ppto">Solo deuda presupuestada (cobrada y pendiente)</option>
@@ -1239,10 +1239,6 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
         <div class="tc">
           <div class="tc-head"><h3>Aging por institución</h3><span>clic en la fila para ver sus financiadores</span></div>
           <div class="scroll"><table class="ag-t" id="ag-inst-table"></table></div>
-        </div>
-        <div class="tc">
-          <div class="tc-head"><h3>Deuda por tramo</h3><span>deuda presupuestada vs. no presupuestada</span></div>
-          <div class="ag-chart"><canvas id="ag-chart"></canvas></div>
         </div>
       </div>
 
@@ -1632,7 +1628,7 @@ function buildMesAnterior(instData, financData){
   set('kpi-cobrado','$'+fmtM1(cobrado));
   set('kpi-cobrado-badge',pc(pctCobKpi)+'% del ppto (sin débitos)');
   set('kpi-deb','$'+fmtM1(debitado));
-  set('kpi-deb-badge',pc(pctDeb)+'% sobre cobrado');
+  set('kpi-deb-badge',pc(pctDeb)+'% sobre cobrado+deb');
 
   // Actualizar subtítulo del período
   if(window._mesAnteriorNombre){
@@ -1652,7 +1648,7 @@ function buildMesAnterior(instData, financData){
     instList.forEach(d=>{
       const deb_cob = d.deb_cob || d.neto || 0;
       const nc=d.presup-(d.cobrado+d.debitado);
-      const pd=pctOf(d.debitado,d.cobrado);
+      const pd=pctOf(d.debitado,(d.cobrado||0)+(d.debitado||0)); // % débitos sobre cobrado + débitos (igual que la tarjeta)
       const pctConDeb = d.presup>0 ? (deb_cob/d.presup*100) : 0;
       const pctSinDeb = d.presup>0 ? (d.cobrado/d.presup*100) : 0;
       const ncClass=nc<0?'cell-brown':'cell-green';
@@ -1757,7 +1753,7 @@ function buildMesAnterior(instData, financData){
     const totCobFin = finList2.reduce((s,d)=>s+(d.deb_cob||((d.cobrado||0)+(d.debitado||0))),0);
     finList2.forEach(d=>{
       const deb_cob=d.deb_cob||(d.cobrado+d.debitado);
-      const pd=pctOf(d.debitado,d.cobrado);
+      const pd=pctOf(d.debitado,(d.cobrado||0)+(d.debitado||0)); // % débitos sobre cobrado + débitos (igual que la tarjeta)
       const nc=d.presup-(d.cobrado+d.debitado);
       const ncClass=nc<0?'cell-brown':'cell-green';
       const tr=document.createElement('tr');
@@ -2246,7 +2242,7 @@ async function loadJunio(){
       totalDebitado += deb;
       totalNeto     += net;
 
-      const entry={financiador:fin,comprobante:comp,fecha_fact:fecha,cobrado:cob,debitado:deb,adeudado:ad,responsable:resp2,cobrado_bool:cobBool};
+      const entry={financiador:fin,comprobante:comp,fecha_fact:fecha,cobrado:cob,debitado:deb,adeudado:ad,responsable:resp2,cobrado_bool:cobBool,neto:net,inst:inst};
       if(!finDetail[fin]) finDetail[fin]={facturas:[],debitos:[]};
       if(deb>0){ instMap[inst].debitos.push(entry); finDetail[fin].debitos.push(entry); }
       else { instMap[inst].facturas.push(entry); finDetail[fin].facturas.push(entry); }
@@ -5367,6 +5363,62 @@ async function saveConfig(id, prefix='cfg-'){
     window.exportTableXLSX(t, titulo + sufijo);
   };
 
+  // ── Mes Actual → Financiadores: menú del botón Excel ──
+  function menuExportJunioFin(btn, table, name){
+    const old = document.getElementById('xls-menu'); if(old){ old.remove(); return; }
+    const m = document.createElement('div');
+    m.id = 'xls-menu';
+    const r = btn.getBoundingClientRect();
+    m.style.cssText = 'position:fixed;z-index:9999;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(13,27,46,.18);padding:6px;min-width:250px;font-family:Inter,sans-serif;top:'+(r.bottom+6)+'px;right:'+Math.max(8, window.innerWidth-r.right)+'px';
+    const item = (titulo, sub, fn) => {
+      const b = document.createElement('button');
+      b.style.cssText = 'display:block;width:100%;text-align:left;background:none;border:none;border-radius:6px;padding:8px 10px;cursor:pointer;font-family:inherit';
+      b.innerHTML = '<div style="font-size:12px;font-weight:700;color:#0d1b2e">'+titulo+'</div><div style="font-size:11px;color:#64748b;margin-top:2px">'+sub+'</div>';
+      b.onmouseenter = () => b.style.background = '#eef4fa';
+      b.onmouseleave = () => b.style.background = 'none';
+      b.onclick = e => { e.stopPropagation(); m.remove(); fn(); };
+      m.appendChild(b);
+    };
+    item('Agrupado por financiador', 'La tabla tal como se ve en pantalla', () => window.exportTableXLSX(table, name));
+    item('Abierto por documento', 'Cada factura del presupuesto, con su cobro y débito', exportJunioDetalle);
+    document.body.appendChild(m);
+    const cerrar = ev => { if(!m.contains(ev.target)){ m.remove(); document.removeEventListener('click', cerrar); window.removeEventListener('scroll', cerrar, true); } };
+    setTimeout(() => { document.addEventListener('click', cerrar); window.addEventListener('scroll', cerrar, true); }, 0);
+  }
+
+  // Detalle del presupuesto del mes en curso, una fila por documento (respeta la institución activa)
+  function exportJunioDetalle(){
+    try{
+      const filas = [];
+      getInsts().forEach(inst => {
+        const d = (typeof junioData !== 'undefined' && junioData[inst]) || null;
+        if(!d) return;
+        [].concat(d.facturas || [], d.debitos || []).forEach(x => filas.push([
+          inst, x.financiador, x.responsable || '', x.comprobante || '', x.fecha_fact || '',
+          x.adeudado || 0, x.neto || 0, x.cobrado || 0, x.debitado || 0,
+          (x.adeudado || 0) - (x.neto || 0), x.cobrado_bool ? 'Sí' : 'No'
+        ]));
+      });
+      if(!filas.length){ alert('Todavía no hay datos del mes para descargar.'); return; }
+      filas.sort((a,b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0]) || String(a[3]).localeCompare(String(b[3])));
+      const head = ['Institución','Financiador','Responsable','Comprobante','Fecha factura','Presupuestado','Cobrado + Débitos','Cobrado (en $)','Débitos','Ppto No Cobrado','Tildada cobrada'];
+      const tot = ['TOTAL','','','','',0,0,0,0,0,''];
+      filas.forEach(f => { for(let c=5;c<=9;c++) tot[c] += f[c]; });
+      const aoa = [head].concat(filas, [tot]);
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      for(let r=1; r<aoa.length; r++) for(let c=5;c<=9;c++){
+        const cell = ws[XLSX.utils.encode_cell({r:r, c:c})];
+        if(cell && cell.t === 'n') cell.z = '#,##0.00';
+      }
+      ws['!cols'] = autoWidth(aoa);
+      ws['!autofilter'] = { ref: XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:filas.length, c:head.length-1}}) };
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Detalle por documento');
+      const mes = (typeof liveMesNombre === 'function' ? liveMesNombre() : 'Mes actual');
+      XLSX.writeFile(wb, fileSafe('Presupuesto ' + mes + ' - detalle por documento') + '_' + stamp() + '.xlsx');
+    }catch(e){ console.error(e); alert('No se pudo generar el Excel: ' + e.message); }
+  }
+
   // ── Botón ⬇ Excel en cada tabla ──
   function injectTableExportButtons(){
     document.querySelectorAll('.page-content table').forEach((t,i)=>{
@@ -5378,6 +5430,12 @@ async function saveConfig(id, prefix='cfg-'){
       btn.textContent = '⬇ Excel';
       btn.title = 'Descargar esta tabla en Excel';
       btn.onclick = e => { e.stopPropagation(); window.exportTableXLSX(t, name); };
+      // Mes Actual → Financiadores: elegir agrupado por financiador o abierto por documento
+      if(t.id === 'junio-fin-table'){
+        btn.textContent = '⬇ Excel ▾';
+        btn.title = 'Descargar agrupado por financiador o abierto por documento';
+        btn.onclick = e => { e.stopPropagation(); menuExportJunioFin(btn, t, name); };
+      }
       const tc   = t.closest('.tc');
       const head = tc && tc.querySelector('.tc-head');
       if(head){
@@ -5903,8 +5961,8 @@ window.AG = (function(){
     $('ag-kpis').innerHTML = `
       <div class="ag-krow ag-k4">
       <div class="kpi-card"><div class="kpi-label">Deuda total al ${agFechaAR(d.corte)}</div><div class="kpi-value">$${f0(neta)}</div><div class="kpi-sub">${A.n.toLocaleString('es-AR')} facturas pendientes · neta de anticipos</div></div>
-      <div class="kpi-card k-green"><div class="kpi-label">Deuda no exigible</div><div class="kpi-value">$${f0(A.t[0])}</div><div class="kpi-sub">${pct(A.t[0],A.tot)} de las facturas · no vencida</div><div class="ag-note">Hasta ${dvt} días desde la fecha de emisión</div></div>
-      <div class="kpi-card k-amber"><div class="kpi-label">Deuda exigible</div><div class="kpi-value">$${f0(A.exig)}</div><div class="kpi-sub">${pct(A.exig,A.tot)} de las facturas · vencida</div><div class="ag-note">Más de ${dvt} días desde la fecha de emisión</div></div>
+      <div class="kpi-card k-green"><div class="kpi-label">Deuda no exigible</div><div class="kpi-value">$${f0(A.t[0])}</div><div class="kpi-sub">${pct(A.t[0],neta)} de la deuda total · no vencida</div><div class="ag-note">Hasta ${dvt} días desde la fecha de emisión</div></div>
+      <div class="kpi-card k-amber"><div class="kpi-label">Deuda exigible</div><div class="kpi-value">$${f0(A.exig + sAf)}</div><div class="kpi-sub">${pct(A.exig + sAf,neta)} de la deuda total · vencida, neta de anticipos</div><div class="ag-note">Más de ${dvt} días desde la fecha de emisión</div></div>
       </div>
       <div class="ag-kgrp">Presupuesto del mes</div>
       <div class="ag-krow ag-k2">
@@ -5992,7 +6050,7 @@ window.AG = (function(){
     rows.forEach(f=>{ (f.pp===2?pc:f.pp===1?pp:np)[f.tr]+=f.p; });
     const M = v => Math.round(v/1e6);
     if(S.chart){ S.chart.destroy(); S.chart=null; }
-    if(typeof Chart==='undefined') return;
+    if(typeof Chart==='undefined' || !$('ag-chart')) return;   // gráfico oculto
     S.chart = new Chart($('ag-chart'), {
       type:'bar',
       data:{ labels:AG_TRAMOS, datasets:[
