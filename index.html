@@ -1266,7 +1266,7 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
   #page-control .ct-controls label{font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:.6px;margin-right:6px}
   #page-control .ct-select{background:#fff;border:1px solid var(--gray-300);border-radius:6px;padding:7px 12px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer}
   #page-control .ct-status{padding:46px 20px;text-align:center;color:var(--gray-500);font-size:14px;line-height:1.6}
-  #page-control .kpi-row{grid-template-columns:repeat(3,1fr)}
+  #page-control .kpi-row{grid-template-columns:repeat(4,1fr)}
   #page-control .kpi-value{font-size:22px}
   #page-control .ct-card{cursor:pointer}
   #page-control .ct-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.08)}
@@ -1309,6 +1309,14 @@ select.deb-ctrl{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
       <div class="sec-title" id="ct-s3">3 · Tildada pero pendiente en Intiza</div>
       <div class="ct-help">Tiene tilde de Cobrado pero en la foto de Intiza <b>sigue pendiente</b>. Puede ser un tilde puesto por error, o un cobro posterior a la fecha de corte de la foto (en ese caso es normal hasta la próxima carga).</div>
       <div class="tc"><div class="tc-head"><h3>Tildada, pendiente en Intiza</h3><span id="ct-c3"></span></div><div class="scroll"><table class="ct-t" id="ct-t3"></table></div></div>
+
+      <div class="sec-title" id="ct-s4">4 · Inconsistencias de carga</div>
+      <div class="ct-help">Errores de carga en la Proyección que se detectan con los datos de la planilla. <b>Las filas sin financiador el panel no las suma</b>: corregirlas antes de cerrar el mes.</div>
+      <div class="tc"><div class="tc-head"><h3>4.1 · Con importes y sin financiador</h3><span id="ct-c41"></span></div><div class="scroll"><table class="ct-t" id="ct-t41"></table></div></div>
+      <div class="tc"><div class="tc-head"><h3>4.2 · Débito sin N° de comprobante (fuera de N/P)</h3><span id="ct-c42"></span></div><div class="scroll"><table class="ct-t" id="ct-t42"></table></div></div>
+      <div class="tc"><div class="tc-head"><h3>4.3 · Comprobante presupuestado dos veces en la misma institución</h3><span id="ct-c43"></span></div><div class="scroll"><table class="ct-t" id="ct-t43"></table></div></div>
+      <div class="tc"><div class="tc-head"><h3>4.4 · Sin responsable</h3><span id="ct-c44"></span></div><div class="scroll"><table class="ct-t" id="ct-t44"></table></div></div>
+      <div class="tc"><div class="tc-head"><h3>4.5 · Tildada sin cobro ni débito (solo hoja GO: GO, INECO, SAN NICOLAS)</h3><span id="ct-c45"></span></div><div class="scroll"><table class="ct-t" id="ct-t45"></table></div></div>
     </div>
   </main>
 </div><!-- end page-control -->
@@ -4740,6 +4748,7 @@ async function procesarExcel(){
     const respData2 = {};
     const rawData = {};
     const facturadoPorFin = {}; // { fin: { inst: adeudado_total } } — todas las filas
+    const descartadas = [];     // filas con importes pero sin financiador: el panel no las suma
 
     sheets.forEach(sheet => {
       // Find actual sheet name (might be S PARQUE etc)
@@ -4759,9 +4768,14 @@ async function procesarExcel(){
         return instData[inst];
       };
 
-      rows.slice(1).forEach(row=>{
+      rows.slice(1).forEach((row, idx)=>{
         const fin = String(row[2]||'').trim();
-        if(!fin || fin==='nan') return;
+        if(!fin || fin==='nan'){
+          const nv = v => typeof v === 'number' ? v : (parseFloat(String(v==null?'':v).replace(',','.')) || 0);
+          const ad0 = nv(row[5]), cob0 = nv(row[6]), deb0 = nv(row[7]);
+          if(ad0 || cob0 || deb0) descartadas.push({ hoja:sheetName, fila: idx+2, comp:String(row[3]||'').trim(), ad:ad0, cob:cob0, deb:deb0 });
+          return;
+        }
         // Institución de la fila: reglas (financiador + columna A) en la hoja GO,
         // nombre de hoja en las demás
         const inst = esMulti ? instHojaGO(row[0], fin) : sheet;
@@ -4844,6 +4858,22 @@ async function procesarExcel(){
       d.neto     = Math.round(d.neto);
       d.deb_cob  = d.neto;
     });
+
+    // Aviso: filas con importes y sin financiador (el panel no las suma)
+    if(descartadas.length){
+      const f2 = n => (Math.round(n*100)/100).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+      const det = descartadas.slice(0,15).map(d=>`• ${d.hoja} fila ${d.fila}${d.comp?' ('+d.comp+')':''}: `+
+        [d.ad?'adeudado '+f2(d.ad):'', d.cob?'cobrado '+f2(d.cob):'', d.deb?'débito '+f2(d.deb):''].filter(Boolean).join(' · ')).join('\n');
+      const mas = descartadas.length>15 ? `\n… y ${descartadas.length-15} más` : '';
+      const seguir = confirm(`⚠️ Hay ${descartadas.length} fila(s) con importes y SIN FINANCIADOR (columna C vacía).\n`+
+        `El panel NO las va a sumar:\n\n${det}${mas}\n\n`+
+        `Completá código y financiador en la Proyección y volvé a exportar el Excel.\n\n¿Guardar igual sin esas filas?`);
+      if(!seguir){
+        document.getElementById('mes-progress').style.display='none';
+        showMesError(`Carga cancelada: ${descartadas.length} fila(s) sin financiador. Corregilas en la Proyección y volvé a subir el Excel.`);
+        return;
+      }
+    }
 
     setProgress(70, 'Guardando en Supabase...');
 
@@ -6234,6 +6264,14 @@ window.CT = (function(){
         const t = x['CobradoBool']===true || x['CobradoBool']==='true' || x['CobradoBool']==1;
         o.tilde = o.tilde && t;
       });
+      // Filas crudas para la sección 4 (inconsistencias de carga)
+      S.live = live.map(x=>({
+        inst: String(x['Institucion']||'').trim(), fin: String(x['Financiador']||'').trim(),
+        comp: String(x['Comprobante']||'').trim(), fecha: x['FechaFact'],
+        respRaw: String(x['Responsable']||'').trim(), resp: agResp(x['Responsable']),
+        ad: agNum(x['Adeudado']), cob: -agNum(x['Cobrado']), deb: agNum(x['Debitado']),
+        tilde: x['CobradoBool']===true || x['CobradoBool']==='true' || x['CobradoBool']==1
+      }));
       const ri = agMapaRespIntiza(S.snap.facturas);
       S.rows = Object.values(by);
       S.rows.forEach(r=>{ if(ri[r.fin]) r.resp = ri[r.fin]; });
@@ -6252,6 +6290,31 @@ window.CT = (function(){
     const l3 = base.filter(r=>r.tilde && (r.k in S.pend) && S.pend[r.k] > 1);
     const ord = (a,b)=> a.inst.localeCompare(b.inst) || a.fin.localeCompare(b.fin) || a.comp.localeCompare(b.comp);
     return [l1.sort(ord), l2.sort(ord), l3.sort(ord)];
+  }
+
+  // Sección 4: inconsistencias de carga sobre las filas crudas de la Proyección
+  const HOJA_GO = ['GO','INECO','SAN NICOLAS'];
+  function inconsistencias(){
+    const insts = getInsts();
+    const L = (S.live||[]).filter(r=> (!r.inst || insts.includes(r.inst)));
+    const conResp = r => !S.resp || r.resp===S.resp;
+    const hayImporte = r => Math.abs(r.ad)>0.005 || Math.abs(r.cob)>0.005 || Math.abs(r.deb)>0.005;
+    const esNP = c => /^N\s*\/?\s*P$/i.test(c);
+    const ord = (a,b)=> a.inst.localeCompare(b.inst) || a.fin.localeCompare(b.fin) || a.comp.localeCompare(b.comp);
+    // 4.1 importes sin financiador (no importa el responsable: es lo más grave)
+    const a = L.filter(r=>!r.fin && hayImporte(r));
+    // 4.2 débito sin comprobante (las N/P quedan afuera)
+    const b = L.filter(r=>r.fin && conResp(r) && Math.abs(r.deb)>0.005 && !r.comp);
+    // 4.3 mismo comprobante presupuestado (adeudado > 0) en 2+ filas de la misma institución
+    const g = {};
+    L.forEach(r=>{ if(!r.comp || esNP(r.comp) || !(r.ad>0)) return;
+      const k = r.inst+'|'+agNormComp(r.comp); (g[k]=g[k]||[]).push(r); });
+    const c = Object.values(g).filter(v=>v.length>1).flat().filter(conResp);
+    // 4.4 filas con importes y sin responsable
+    const d = L.filter(r=>r.fin && hayImporte(r) && !r.respRaw);
+    // 4.5 hoja GO: tildada, con importe y sin cobro ni débito
+    const e = L.filter(r=>HOJA_GO.includes(r.inst) && conResp(r) && r.tilde && r.ad>0 && Math.abs(r.cob)<0.005 && Math.abs(r.deb)<0.005);
+    return [a.sort(ord), b.sort(ord), c.sort(ord), d.sort(ord), e.sort(ord)];
   }
 
   function tabla(id, list, cols, cnt){
@@ -6273,10 +6336,15 @@ window.CT = (function(){
     const card = (n,titulo,l,monto,color,sec)=>`<div class="kpi-card ct-card" style="border-top-color:${color}" onclick="document.getElementById('${sec}').scrollIntoView({behavior:'smooth'})">
         <div class="kpi-label">${n} · ${titulo}</div><div class="kpi-value">${l.length}</div>
         <div class="kpi-sub">${l.length?'$'+f0(monto):'sin casos'}</div></div>`;
+    const inc = inconsistencias();
+    const nInc = inc.reduce((s,l)=>s+l.length,0);
     $('ct-kpis').innerHTML =
       card(1,'Cobro completo sin tilde', l1, sum(l1,r=>r.ad), '#b45309','ct-s1') +
       card(2,'Sin tilde, cobrada en Intiza', l2, sum(l2,r=>r.ad), '#c94040','ct-s2') +
-      card(3,'Tildada, pendiente en Intiza', l3, sum(l3,r=>S.pend[r.k]), '#2563a8','ct-s3');
+      card(3,'Tildada, pendiente en Intiza', l3, sum(l3,r=>S.pend[r.k]), '#2563a8','ct-s3') +
+      `<div class="kpi-card ct-card" style="border-top-color:#7c3aed" onclick="document.getElementById('ct-s4').scrollIntoView({behavior:'smooth'})">
+        <div class="kpi-label">4 · Inconsistencias de carga</div><div class="kpi-value">${nInc}</div>
+        <div class="kpi-sub">${inc[0].length ? '⚠️ '+inc[0].length+' fila(s) sin financiador' : (nInc?'filas a revisar':'sin casos')}</div></div>`;
     // botones de institución (mismo comportamiento que el resto del panel)
     const bw = $('ct-inst-btns'); bw.innerHTML='';
     const allowed = getAllowedInsts();
@@ -6296,6 +6364,15 @@ window.CT = (function(){
     tabla('ct-t1', l1, [C.inst,C.fin,C.comp,C.fecha,C.ad,C.cob,C.deb,C.resp], 'ct-c1');
     tabla('ct-t2', l2, [C.inst,C.fin,C.comp,C.fecha,C.ad,C.cd,C.resp], 'ct-c2');
     tabla('ct-t3', l3, [C.inst,C.fin,C.comp,C.fecha,C.ad,C.cd,C.pi,C.resp], 'ct-c3');
+    const vacio = v => v || '—';
+    const CI = { inst:{h:'Institución',v:r=>vacio(r.inst)}, fin:{h:'Financiador',v:r=>vacio(r.fin)}, comp:{h:'Comprobante',v:r=>vacio(r.comp)},
+                 fecha:{h:'Fecha fact.',v:r=>r.fecha?fmtFechaAR(r.fecha):''}, resp:{h:'Responsable',v:r=>vacio(r.resp)} };
+    tabla('ct-t41', inc[0], [CI.inst,CI.fin,CI.comp,CI.fecha,C.ad,C.cob,C.deb,CI.resp], 'ct-c41');
+    tabla('ct-t42', inc[1], [CI.inst,CI.fin,CI.comp,CI.fecha,C.ad,C.cob,C.deb,CI.resp], 'ct-c42');
+    tabla('ct-t43', inc[2], [CI.inst,CI.fin,CI.comp,CI.fecha,C.ad,C.cob,C.deb,CI.resp], 'ct-c43');
+    tabla('ct-t44', inc[3], [CI.inst,CI.fin,CI.comp,CI.fecha,C.ad,C.cob,C.deb], 'ct-c44');
+    tabla('ct-t45', inc[4], [CI.inst,CI.fin,CI.comp,CI.fecha,C.ad,C.cob,C.deb,CI.resp], 'ct-c45');
+    ['ct-c41','ct-c42','ct-c43','ct-c44','ct-c45'].forEach((id,i)=>{ $(id).textContent = inc[i].length+' filas'; });
     $('ct-status').style.display='none'; $('ct-body').style.display='block';
   }
 
