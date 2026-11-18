@@ -5524,11 +5524,13 @@ const AG_PREFIJO = 'Aging ';
 const AG_RESP_ALIAS = { 'VANE':'VANESA', 'NICO':'NICOLAS', 'NACHO':'IGNACIO' };
 function agResp(r){ const u = String(r||'').trim().toUpperCase(); return AG_RESP_ALIAS[u] || u; }
 // Responsable de cada financiador según Intiza (el más frecuente en la foto). Manda sobre el de la Proyección.
+// Nombre de financiador para comparar Intiza con la Proyección: sin acentos, mayúsculas, espacios simples
+function agFinKey(s){ return String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim().replace(/NICOLASLAS/g,'NICOLAS'); }
 function agMapaRespIntiza(facturas){
   const c = {};
   (facturas||[]).forEach(f=>{ const r = agResp(f.r); if(!f.c || !r) return; const m = c[f.c] = c[f.c] || {}; m[r] = (m[r]||0)+1; });
   const out = {};
-  Object.entries(c).forEach(([fin,m])=>{ out[fin] = Object.entries(m).sort((a,b)=>b[1]-a[1])[0][0]; });
+  Object.entries(c).forEach(([fin,m])=>{ const r = Object.entries(m).sort((a,b)=>b[1]-a[1])[0][0]; out[fin] = r; const k = agFinKey(fin); if(!(k in out)) out[k] = r; });
   return out;
 }
 
@@ -5839,7 +5841,7 @@ window.AG = (function(){
   // Mes en curso: feed en vivo. Mes cerrado: Excel archivado de ese mes (RAW_DATA).
   // Presupuesto cargado por importe, sin número de factura (IAPOS por quincena, Medicina Esencial, etc.)
   function pptoSinFactura(){
-    const insts = getInsts(), ok = (i,r,fin)=> insts.includes(i) && (!S.resp || ((S.respInt||{})[String(fin||'').trim()] || agResp(r))===S.resp) && (!finActivos().length || finActivos().includes(String(fin||'').trim()));
+    const insts = getInsts(), ok = (i,r,fin)=> insts.includes(i) && (!S.resp || ((S.respInt||{})[String(fin||'').trim()] || (S.respInt||{})[agFinKey(fin)] || agResp(r))===S.resp) && (!finActivos().length || finActivos().includes(String(fin||'').trim()));
     const esFc = c => /^[A-Z]+-\d+-\d+$/.test(agNormComp(c));
     const out = {t:0, det:{}};
     const add = (fin,v)=>{ out.t+=v; out.det[fin]=(out.det[fin]||0)+v; };
@@ -5856,7 +5858,7 @@ window.AG = (function(){
   }
 
   function pptoOriginal(){
-    const insts = getInsts(), ok = (i,r,fin)=> insts.includes(i) && (!S.resp || ((S.respInt||{})[String(fin||'').trim()] || agResp(r))===S.resp) && (!finActivos().length || finActivos().includes(String(fin||'').trim()));
+    const insts = getInsts(), ok = (i,r,fin)=> insts.includes(i) && (!S.resp || ((S.respInt||{})[String(fin||'').trim()] || (S.respInt||{})[agFinKey(fin)] || agResp(r))===S.resp) && (!finActivos().length || finActivos().includes(String(fin||'').trim()));
     if(S.pptoFuente==='vivo' && Array.isArray(window._liveRowsAll)){
       let t=0; window._liveRowsAll.forEach(x=>{ const i=String(x['Institucion']||'').trim(); if(ok(i, x['Responsable'], x['Financiador'])) t+=agNum(x['Adeudado']); });
       return t;
@@ -6237,12 +6239,12 @@ window.CT = (function(){
       });
       const ri = agMapaRespIntiza(S.snap.facturas);
       // Financiadores que existen en Intiza, y numeración de sus facturas por serie (letra + punto de venta)
-      S.finIntiza = new Set(S.snap.facturas.map(f=>f.c));
+      S.finIntiza = new Set(S.snap.facturas.map(f=>agFinKey(f.c)));
       S.series = {};
       S.snap.facturas.forEach(f=>{ if(/anticipo/i.test(f.t)) return; const m = agNormComp(f.f).match(/^([A-Z]+-\d+)-(\d+)$/); if(!m || !f.e) return;
         (S.series[m[1]] = S.series[m[1]] || []).push([f.e, +m[2]]); });
       S.rows = Object.values(by);
-      S.rows.forEach(r=>{ if(ri[r.fin]) r.resp = ri[r.fin]; });
+      S.rows.forEach(r=>{ const x = ri[r.fin] || ri[agFinKey(r.fin)]; if(x) r.resp = x; });
       S.loaded = true;
       const resps = [...new Set(S.rows.map(r=>r.resp).filter(Boolean))].sort();
       $('ct-resp').innerHTML = '<option value="">Todos</option>' + resps.map(r=>`<option>${esc(r)}</option>`).join('');
@@ -6265,9 +6267,9 @@ window.CT = (function(){
     const l1 = base.filter(r=>!r.tilde && r.ad>0 && (r.cob+r.deb) >= r.ad - 1);
     // Control 2: no aplica a financiadores que no están en Intiza ni a notas de débito (no se importan a Intiza)
     const c2 = base.filter(r=>!r.tilde && r.ad>0 && !(r.k in S.pend));
-    const l2 = c2.filter(r=>S.finIntiza.has(r.fin) && !esND(r));
-    S.fuera2 = { fin:[...new Set(c2.filter(r=>!S.finIntiza.has(r.fin)).map(r=>r.fin))].sort(),
-                 nd: c2.filter(r=>S.finIntiza.has(r.fin) && esND(r)) };
+    const l2 = c2.filter(r=>S.finIntiza.has(agFinKey(r.fin)) && !esND(r));
+    S.fuera2 = { fin:[...new Set(c2.filter(r=>!S.finIntiza.has(agFinKey(r.fin))).map(r=>r.fin))].sort(),
+                 nd: c2.filter(r=>S.finIntiza.has(agFinKey(r.fin)) && esND(r)) };
     const l3 = base.filter(r=>r.tilde && (r.k in S.pend) && S.pend[r.k] > 1);
     const ord = (a,b)=> a.inst.localeCompare(b.inst) || a.fin.localeCompare(b.fin) || a.comp.localeCompare(b.comp);
     return [l1.sort(ord), l2.sort(ord), l3.sort(ord)];
